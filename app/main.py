@@ -1,8 +1,33 @@
+from contextlib import asynccontextmanager
+import aiosqlite
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-app = FastAPI(title="Jarvis API", description="Backend API for Jarvis", version="1.0.0")
+from .api.chat import router as chat_router
+from .agent.state import build_graph
+
+# TODO: Where to load env variables?
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    conn = await aiosqlite.connect("checkpoints.db")
+    app.state.checkpointer = AsyncSqliteSaver(conn)
+    app.state.graph = build_graph(app.state.checkpointer)
+
+    yield
+
+    await conn.close()
+
+
+app = FastAPI(
+    title="Jarvis API",
+    description="Backend API for Jarvis",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 # Configure CORS
 app.add_middleware(
@@ -12,6 +37,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(chat_router)
 
 
 @app.get("/")
