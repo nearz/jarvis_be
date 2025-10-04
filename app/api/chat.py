@@ -25,7 +25,8 @@ async def chat(req: ChatRequest, graph=Depends(get_app_graph)):
 
 @router.post("/chat/{thread_id}")
 async def chat_thread(thread_id: str, req: ChatRequest, graph=Depends(get_app_graph)):
-    print("Chat Thread EP")
+    msg = HumanMessage(req.message)
+    msg.pretty_print()
     result = await graph.ainvoke(
         {"messages": [HumanMessage(req.message)]},
         config={"configurable": {"thread_id": thread_id}},
