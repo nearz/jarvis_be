@@ -4,6 +4,7 @@ from typing import Annotated, TypedDict, Sequence
 from langchain_core.messages import BaseMessage, SystemMessage, AIMessage
 from langgraph.graph import add_messages
 from langgraph.graph import StateGraph, START, END
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
 from langgraph.prebuilt import ToolNode
 
@@ -20,6 +21,7 @@ class ContextSchema:
     llm: str
 
 
+# TODO: Remove pretty print for logging
 def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
     system_prompt = SystemMessage(
         "You are an AI assistant, plese answer my query to the best of your ability"
@@ -42,7 +44,9 @@ def should_continue(state: AgentState) -> bool:
     return tool_call
 
 
-def build_graph(checkpointer):
+def build_graph(
+    checkpointer,
+) -> CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState]:
     graph = StateGraph(AgentState, context_schema=ContextSchema)
     graph.add_node("call_llm", call_llm)
     graph.add_node("tools", ToolNode(tools=get_tools()))
