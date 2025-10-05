@@ -24,7 +24,7 @@ class ContextSchema:
 # TODO: Remove pretty print for logging
 def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
     system_prompt = SystemMessage(
-        "You are an AI assistant, plese answer my query to the best of your ability"
+        "You are an AI assistant, please answer my query to the best of your ability"
     )
 
     llm = get_model_with_tools(runtime.context.llm)
@@ -35,13 +35,9 @@ def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
 
 
 def should_continue(state: AgentState) -> bool:
+    """Returns True if the last message has tool calls, False otherwise"""
     last_msg = state["messages"][-1]
-    tool_call = False
-    if isinstance(last_msg, AIMessage):
-        if last_msg.tool_calls:
-            tool_call = True
-            return tool_call
-    return tool_call
+    return isinstance(last_msg, AIMessage) and bool(last_msg.tool_calls)
 
 
 def build_graph(
