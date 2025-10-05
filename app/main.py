@@ -14,8 +14,8 @@ from .agent.state import build_graph
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     conn = await aiosqlite.connect("checkpoints.db")
-    app.state.checkpointer = AsyncSqliteSaver(conn)
-    app.state.graph = build_graph(app.state.checkpointer)
+    app.state.saver = AsyncSqliteSaver(conn)
+    app.state.graph = build_graph(app.state.saver)
 
     yield
 

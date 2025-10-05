@@ -7,6 +7,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph, RunnableConfig
 
 from ..agent.state import AgentState, ContextSchema
+from ..core.db_ops.agent_checkpoints_db import thread_exists
 
 
 class ChatErrorType(Enum):
@@ -42,62 +43,9 @@ async def chat_controller(
     *,
     thread_id: Union[str, None],
 ) -> ChatResult:
-    try:
-        # New Chat does not provide a thread id
-        if not thread_id:
-            thread_id = str(uuid4())
-
-        # Type check params
-        if not isinstance(message, str):
-            return ChatResult(
-                success=False,
-                error_type=ChatErrorType.VALIDATION_ERROR,
-                error_details="Message must be a string",
-            )
-
-        if not isinstance(llm, str):
-            return ChatResult(
-                success=False,
-                error_type=ChatErrorType.VALIDATION_ERROR,
-                error_details="LLM model must be a string",
-            )
-
-        if not isinstance(thread_id, str):
-            return ChatResult(
-                success=False,
-                error_type=ChatErrorType.VALIDATION_ERROR,
-                error_details="Thread ID must be a string",
-            )
-
-        # Content validation
-        if not message.strip():
-            return ChatResult(
-                success=False,
-                error_type=ChatErrorType.VALIDATION_ERROR,
-                error_details="Message cannot be empty",
-            )
-
-        if not llm.strip():
-            return ChatResult(
-                success=False,
-                error_type=ChatErrorType.VALIDATION_ERROR,
-                error_details="LLM model must be specified",
-            )
-
-        if not thread_id.strip():
-            return ChatResult(
-                success=False,
-                error_type=ChatErrorType.VALIDATION_ERROR,
-                error_details="Thread ID must be specified",
-            )
-
-    except Exception as e:
-        logging.error(f"Unexpected error during validation: {e}")
-        return ChatResult(
-            success=False,
-            error_type=ChatErrorType.SYSTEM_ERROR,
-            error_details="An unexpected system error occurred",
-        )
+    # New Chat does not provide a thread id, set one for new thread
+    if not thread_id:
+        thread_id = str(uuid4())
 
     # Graph execution
     try:

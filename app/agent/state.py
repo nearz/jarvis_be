@@ -45,7 +45,7 @@ def should_continue(state: AgentState) -> bool:
 
 
 def build_graph(
-    checkpointer,
+    saver,
 ) -> CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState]:
     graph = StateGraph(AgentState, context_schema=ContextSchema)
     graph.add_node("call_llm", call_llm)
@@ -62,4 +62,4 @@ def build_graph(
     )
     graph.add_edge("tools", "call_llm")
 
-    return graph.compile(checkpointer=checkpointer)
+    return graph.compile(checkpointer=saver)
