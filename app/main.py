@@ -7,19 +7,21 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .api.chat import router as chat_router
 from .agent.state import build_graph
+from .agent.tavily_client import get_async_tavily_client
 
-# TODO: Where to load env variables?
 
-
+# TODO what error handling do I need in lifespan?
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     conn = await aiosqlite.connect("checkpoints.db")
     app.state.saver = AsyncSqliteSaver(conn)
     app.state.graph = build_graph(app.state.saver)
+    get_async_tavily_client()
 
     yield
 
     await conn.close()
+    get_async_tavily_client.cache_clear()
 
 
 app = FastAPI(

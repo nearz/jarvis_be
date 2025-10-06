@@ -1,8 +1,14 @@
+import logging
 import os
 from langchain_core.tools import tool, BaseTool
 from tavily import TavilyClient
 
+from .tavily_client import get_async_tavily_client, MissingApiKey
+
 _TOOLS_REGISTRY = []
+
+TAVILY_MAX_RESULTS = 5
+TAVILY_TIMEOUT = 15
 
 
 def register_tool(func):
@@ -11,8 +17,9 @@ def register_tool(func):
     return decorated
 
 
+# TODO: Should I consider adding max_results as param?
 @register_tool
-def tavily_search(query: str) -> str:
+async def tavily_search(query: str) -> str:
     """
     Search the web using Tavily API for real-time information.
 
@@ -22,29 +29,37 @@ def tavily_search(query: str) -> str:
     Returns:
         A formatted string containing search results with titles, URLs, and content snippets
     """
-    api_key = os.getenv("TAVILY_API_KEY")
-    if not api_key:
-        return "Error: TAVILY_API_KEY environment variable not set. Please set your Tavily API key."
+    try:
+        client = get_async_tavily_client()
+    except MissingApiKey as e:
+        return f"Error: {e}"
 
     try:
-        tavily_client = TavilyClient(api_key=api_key)
-        response = tavily_client.search(query, search_depth="advanced", max_results=5)
+        resp = await client.search(
+            query,
+            search_depth="advanced",
+            max_results=TAVILY_MAX_RESULTS,
+            timeout=TAVILY_TIMEOUT,
+        )
 
-        if not response or "results" not in response:
+        results = (resp or {}).get("results", [])
+        if not results:
             return f"No results found for query: {query}"
 
-        results = []
-        for result in response["results"]:
-            title = result.get("title", "No title")
-            url = result.get("url", "No URL")
-            content = result.get("content", "No content available")
+        lines = [f"Search results for '{query}'"]
+        for r in results[:5]:
+            title = r.get("title", "No title")
+            url = r.get("url", "No url")
+            content = r.get("content", "").strip()
+            if len(content) > 400:
+                content = content[:397] + "..."
+            lines.append(f"- **{title}**\n {url}\n {content}")
 
-            results.append(f"**{title}**\nURL: {url}\nContent: {content}\n")
-
-        return f"Search results for '{query}':\n\n" + "\n".join(results)
+        return "\n".join(lines)
 
     except Exception as e:
-        return f"Error performing search: {str(e)}"
+        logging.error(e)
+        return f"Error performing Tavily search: {e}"
 
 
 def get_tools() -> list[BaseTool]:

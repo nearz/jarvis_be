@@ -22,14 +22,14 @@ class ContextSchema:
 
 
 # TODO: Remove pretty print for logging
-def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
+async def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
     system_prompt = SystemMessage(
         "You are an AI assistant, please answer my query to the best of your ability"
     )
 
     llm = get_model_with_tools(runtime.context.llm)
     all_msgs = [system_prompt] + list(state["messages"])
-    response = llm.invoke(all_msgs)
+    response = await llm.ainvoke(all_msgs)
     response.pretty_print()
     return {"messages": [response]}
 
