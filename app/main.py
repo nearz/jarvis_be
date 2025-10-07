@@ -9,6 +9,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from .api.chat import router as chat_router
 from .agent.state import build_graph
 from .agent.tavily_client import get_async_tavily_client, MissingApiKey
+from .core.config import settings
 
 
 # TODO: Test the exceptions in mocks
@@ -34,9 +35,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Jarvis API",
-    description="Backend API for Jarvis",
-    version="1.0.0",
+    title=settings.APP_TITLE,
+    description=settings.APP_DESCRIPTION,
+    version=settings.APP_VER,
     lifespan=lifespan,
 )
 
@@ -56,6 +57,11 @@ app.include_router(chat_router)
 async def root():
     """Root endpoint"""
     return {"message": "Welcome to Jarvis API"}
+
+
+@app.get("/settings")
+async def print_settings():
+    print(settings.TAVILY_API_KEY)
 
 
 @app.get("/health")
