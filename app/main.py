@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 import aiosqlite
 
 from fastapi import FastAPI
@@ -7,16 +8,24 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .api.chat import router as chat_router
 from .agent.state import build_graph
-from .agent.tavily_client import get_async_tavily_client
+from .agent.tavily_client import get_async_tavily_client, MissingApiKey
 
 
-# TODO what error handling do I need in lifespan?
+# TODO: Test the exceptions in mocks
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    conn = await aiosqlite.connect("checkpoints.db")
-    app.state.saver = AsyncSqliteSaver(conn)
-    app.state.graph = build_graph(app.state.saver)
-    get_async_tavily_client()
+    try:
+        conn = await aiosqlite.connect("checkpoints.db")
+        app.state.saver = AsyncSqliteSaver(conn)
+        app.state.graph = build_graph(app.state.saver)
+        try:
+            get_async_tavily_client()
+        except MissingApiKey:
+            raise RuntimeError("Tavily API key not set.")
+
+    except Exception as e:
+        logging.error(f"Failed to intialize application: {e}")
+        raise
 
     yield
 
