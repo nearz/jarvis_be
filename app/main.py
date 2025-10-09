@@ -1,8 +1,9 @@
+import uuid
 from contextlib import asynccontextmanager
 import logging
 import aiosqlite
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
@@ -10,6 +11,11 @@ from .api.chat import router as chat_router
 from .agent.state import build_graph
 from .agent.tavily_client import get_async_tavily_client, MissingApiKey
 from .core.config import settings
+from .core.logging import setup_logging, get_logger
+from .middleware import LoggingMiddleware
+
+setup_logging(settings.LOG_LEVEL)
+logger = get_logger(__name__)
 
 
 # TODO: Test the exceptions in mocks
@@ -22,16 +28,19 @@ async def lifespan(app: FastAPI):
         try:
             get_async_tavily_client()
         except MissingApiKey:
+            logger.exception("Tavily API key not set.")
             raise RuntimeError("Tavily API key not set.")
 
     except Exception as e:
-        logging.error(f"Failed to intialize application: {e}")
+        logger.exception(f"Failed to initialize application: %s", e)
         raise
 
+    logger.info("Application Started | Version %s", app.version)
     yield
 
     await conn.close()
     get_async_tavily_client.cache_clear()
+    logger.info("Application Stopped")
 
 
 app = FastAPI(
@@ -40,6 +49,8 @@ app = FastAPI(
     version=settings.APP_VER,
     lifespan=lifespan,
 )
+
+app.add_middleware(LoggingMiddleware)
 
 # Configure CORS
 app.add_middleware(
@@ -57,11 +68,6 @@ app.include_router(chat_router)
 async def root():
     """Root endpoint"""
     return {"message": "Welcome to Jarvis API"}
-
-
-@app.get("/settings")
-async def print_settings():
-    print(settings.TAVILY_API_KEY)
 
 
 @app.get("/health")

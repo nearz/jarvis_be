@@ -8,6 +8,9 @@ from langgraph.graph.state import CompiledStateGraph, RunnableConfig
 
 from ..agent.state import AgentState, ContextSchema
 from ..core.db_ops.agent_checkpoints_db import thread_exists
+from ..core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ChatErrorType(Enum):
@@ -34,7 +37,6 @@ class ChatResult:
         self.error_details = error_details
 
 
-# TODO: Remove pretty_print to logging
 # TODO: Is there a better way to setup ainvoke params package? Maybe a func in state.
 async def chat_controller(
     message: str,
@@ -46,18 +48,28 @@ async def chat_controller(
     # New Chat does not provide a thread id, set one for new thread
     if not thread_id:
         thread_id = str(uuid4())
+        logger.info("New thread created | thread_id: %s", thread_id)
+    else:
+        logger.info("Existing thread | thread_id: %s", thread_id)
 
     # Graph execution
     try:
         msg = HumanMessage(message)
-        msg.pretty_print()
+        logger.debug(
+            "Invoking graph | thread_id: %s | message preview: %s",
+            thread_id,
+            message[:100],
+        )
         config = RunnableConfig({"configurable": {"thread_id": thread_id}})
         context = ContextSchema(llm)
 
         coro = graph.ainvoke({"messages": [msg]}, config=config, context=context)
         result = await coro
 
+        logger.info("Graph execution complete | thread_id: %s", thread_id)
+
     except TimeoutError as e:
+        logger.exception("Timeout error | thread_id: %s", thread_id)
         return ChatResult(
             success=False,
             thread_id=thread_id,
@@ -69,6 +81,12 @@ async def chat_controller(
         # This catches LLM API errors, tool errors, graph execution errors
         error_msg = str(e)
 
+        logger.exception(
+            "Graph execution failed | thread_id: %s | error message: %s",
+            thread_id,
+            error_msg,
+        )
+
         return ChatResult(
             success=False,
             thread_id=thread_id,
@@ -79,6 +97,7 @@ async def chat_controller(
     # Process AI Response
     try:
         if not result or "messages" not in result:
+            logger.error("Invalid response structure | thread_id: %s", thread_id)
             return ChatResult(
                 success=False,
                 thread_id=thread_id,
@@ -88,6 +107,7 @@ async def chat_controller(
 
         messages = result["messages"]
         if not messages:
+            logger.error("No messages in response | thread_id: %s", thread_id)
             return ChatResult(
                 success=False,
                 thread_id=thread_id,
@@ -97,6 +117,7 @@ async def chat_controller(
 
         last_message = messages[-1]
         if not hasattr(last_message, "content") or last_message.content is None:
+            logger.error("Empty message content | thread_id: %s", thread_id)
             return ChatResult(
                 success=False,
                 thread_id=thread_id,
@@ -104,11 +125,18 @@ async def chat_controller(
                 error_details="Empty response generated",
             )
 
+        logger.info(
+            "Graph executed succesfully | thread_id: %s | AI message preview: %s",
+            thread_id,
+            last_message.content[:400],
+        )
+
         return ChatResult(
             success=True, message=last_message.content, thread_id=thread_id
         )
 
     except Exception as e:
+        logger.exception("Graph execution failed | thread_id: %s", thread_id)
         return ChatResult(
             success=False,
             thread_id=thread_id,

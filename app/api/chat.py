@@ -5,16 +5,20 @@ from .dependencies import get_app_graph, get_graph_saver
 from ..models.request_models import ChatRequest
 from ..controllers.chat import chat_controller, ChatErrorType, ChatResult
 from ..core.db_ops.agent_checkpoints_db import thread_exists
+from ..core.logging import get_logger
 
 
+logger = get_logger(__name__)
 router = APIRouter()
 
 
 @router.post("/chat")
 async def chat(req: ChatRequest, graph=Depends(get_app_graph)):
+    logger.info("New Chat | message len: %d | llm: %s", len(req.message), req.llm)
     result = await chat_controller(req.message, req.llm, graph, thread_id=None)
 
     if result.success:
+        logger.info("Chat succesful | thread id: %s", result.thread_id)
         return JSONResponse(
             status_code=200,
             content={
@@ -24,6 +28,11 @@ async def chat(req: ChatRequest, graph=Depends(get_app_graph)):
             },
         )
     else:
+        logger.warning(
+            "Chat failed | error_type: %s | error_details: %s",
+            result.error_type.value,
+            result.error_details,
+        )
         return create_error_response(result)
 
 
@@ -35,7 +44,10 @@ async def chat_thread(
     saver=Depends(get_graph_saver),
 ):
     thread_id = thread_id.strip()
+    logger.info("Chat thread request | thread_id: %s", thread_id)
+
     if not await thread_exists(saver, thread_id):
+        logger.warning("Thread id not found | thread_id: %s", thread_id)
         return JSONResponse(
             status_code=400,
             content={
@@ -49,6 +61,7 @@ async def chat_thread(
     result = await chat_controller(req.message, req.llm, graph, thread_id=thread_id)
 
     if result.success:
+        logger.info("Chat thread request succesful | thread_id: %s", thread_id)
         return JSONResponse(
             status_code=200,
             content={
@@ -58,6 +71,11 @@ async def chat_thread(
             },
         )
     else:
+        logger.warning(
+            "Chat thread request failed | error_type: %s | error_details: %s",
+            result.error_type.value,
+            result.error_details,
+        )
         return create_error_response(result)
 
 

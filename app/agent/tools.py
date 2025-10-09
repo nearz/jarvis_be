@@ -4,6 +4,9 @@ from langchain_core.tools import tool, BaseTool
 from tavily import TavilyClient
 
 from .tavily_client import get_async_tavily_client, MissingApiKey
+from ..core.logging import get_logger
+
+logger = get_logger(__name__)
 
 _TOOLS_REGISTRY = []
 
@@ -32,6 +35,7 @@ async def tavily_search(query: str) -> str:
     try:
         client = get_async_tavily_client()
     except MissingApiKey as e:
+        logger.exception("Tavily API key not set")
         return f"Error: {e}"
 
     try:
@@ -44,7 +48,10 @@ async def tavily_search(query: str) -> str:
 
         results = (resp or {}).get("results", [])
         if not results:
+            logger.warning("No results for query: %s", query)
             return f"No results found for query: {query}"
+
+        logger.info("Tavily search complete | results count: %d", len(results))
 
         lines = [f"Search results for '{query}'"]
         for r in results[:5]:
@@ -58,7 +65,7 @@ async def tavily_search(query: str) -> str:
         return "\n".join(lines)
 
     except Exception as e:
-        logging.error(e)
+        logger.exception("Tavily search failed | query %s | error: %s", query, str(e))
         return f"Error performing Tavily search: {e}"
 
 
