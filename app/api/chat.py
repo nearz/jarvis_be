@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from .dependencies import get_app_graph, get_graph_saver
@@ -33,7 +33,7 @@ async def chat(req: ChatRequest, graph=Depends(get_app_graph)):
             result.error_type.value,
             result.error_details,
         )
-        return create_error_response(result)
+        return _create_error_response(result)
 
 
 @router.post("/chat/{thread_id}")
@@ -76,10 +76,10 @@ async def chat_thread(
             result.error_type.value,
             result.error_details,
         )
-        return create_error_response(result)
+        return _create_error_response(result)
 
 
-def create_error_response(result: ChatResult) -> JSONResponse:
+def _create_error_response(result: ChatResult) -> JSONResponse:
     """
     Maps ChatResult error types to HTTP status codes and returns formatted error response.
     """
@@ -91,7 +91,9 @@ def create_error_response(result: ChatResult) -> JSONResponse:
         ChatErrorType.SYSTEM_ERROR: 500,
     }
 
-    status_code = status_code_map.get(result.error_type, 400)
+    status_code = 400
+    if result.error_type is not None:
+        status_code = status_code_map.get(result.error_type, 400)
 
     return JSONResponse(
         status_code=status_code,

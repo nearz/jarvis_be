@@ -8,10 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .api.chat import router as chat_router
+from .api.auth import router as auth_router
 from .agent.state import build_graph
 from .agent.tavily_client import get_async_tavily_client, MissingApiKey
 from .core.config import settings
 from .core.logging import setup_logging, get_logger
+from .core.db_ops.app_db import init_app_db, AppDatabase
 from .middleware import LoggingMiddleware
 
 setup_logging(settings.LOG_LEVEL)
@@ -22,9 +24,14 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        conn = await aiosqlite.connect("checkpoints.db")
-        app.state.saver = AsyncSqliteSaver(conn)
+        checkpoints_conn = await aiosqlite.connect("checkpoints.db")
+        app.state.saver = AsyncSqliteSaver(checkpoints_conn)
         app.state.graph = build_graph(app.state.saver)
+
+        app_db_conn = await aiosqlite.connect("app.db")
+        await init_app_db(app_db_conn)
+        app.state.app_db = AppDatabase(app_db_conn)
+
         try:
             get_async_tavily_client()
         except MissingApiKey:
@@ -38,7 +45,8 @@ async def lifespan(app: FastAPI):
     logger.info("Application Started | Version %s", app.version)
     yield
 
-    await conn.close()
+    await checkpoints_conn.close()
+    await app_db_conn.close()
     get_async_tavily_client.cache_clear()
     logger.info("Application Stopped")
 
@@ -62,6 +70,7 @@ app.add_middleware(
 )
 
 app.include_router(chat_router)
+app.include_router(auth_router)
 
 
 @app.get("/")

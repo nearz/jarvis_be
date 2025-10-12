@@ -1,4 +1,11 @@
-from fastapi import Request
+from fastapi import Request, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from ..core.db_ops.app_db import AppDatabase
+from ..core.auth.token import decode_token
+from ..models.user import User
+
+security = HTTPBearer()
 
 
 def get_app_graph(req: Request):
@@ -7,3 +14,52 @@ def get_app_graph(req: Request):
 
 def get_graph_saver(req: Request):
     return req.app.state.saver
+
+
+def get_app_db(req: Request):
+    return req.app.state.app_db
+
+
+async def get_current_user(
+    creds: HTTPAuthorizationCredentials = Depends(security),
+    app_db: AppDatabase = Depends(get_app_db),
+) -> User:
+    """
+    Validates JWT and returns current user.
+    Raises:
+        HTTPException 401: If token invalid, expired, or user not found.
+    """
+    token = creds.credentials
+
+    try:
+        payload = decode_token(token)
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Unexpected error during authenitcation",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("sub")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Token missing user identifier",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = await app_db.get_user_by_id(user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return User(id=user["id"], email=user["email"])
