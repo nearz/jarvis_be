@@ -1,10 +1,15 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, TypedDict
 
 import jwt
 from fastapi import HTTPException
 
 from ..config import settings
+
+
+class TokenPayload(TypedDict):
+    sub: str
+    exp: str
 
 
 def encode_token(data: dict) -> str:
@@ -21,7 +26,7 @@ def encode_token(data: dict) -> str:
     return encoded_jwt
 
 
-def decode_token(token: str) -> dict[str, Any]:
+def decode_token(token: str) -> TokenPayload:
     """
     Decode and validate JWT token.
 
@@ -33,7 +38,8 @@ def decode_token(token: str) -> dict[str, Any]:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        return payload
+        token_payload = TokenPayload(payload)
+        return token_payload
 
     except jwt.ExpiredSignatureError:
         raise HTTPException(

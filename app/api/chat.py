@@ -11,6 +11,8 @@ from ..core.logging import get_logger
 logger = get_logger(__name__)
 router = APIRouter()
 
+# TODO: Add pydantic response models, if applicable with streaming.
+
 
 @router.post("/chat")
 async def chat(req: ChatRequest, graph=Depends(get_app_graph)):

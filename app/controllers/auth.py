@@ -34,6 +34,10 @@ class AuthResult:
         self.error_details = error_details
 
 
+# NOTE:
+# If in production I should fail silently to avoid user enumeration.
+# Consider industry patterns like sending an email to complete registration. Or if
+# existing user let them know someone tried to register with their email.
 async def register_controller(
     email: str, password: str, app_db: AppDatabase
 ) -> AuthResult:
@@ -60,7 +64,9 @@ async def register_controller(
 
     except Exception as e:
         logger.exception("System error: %s", str(e))
-        return AuthResult(False, AuthErrorType.SYSTEM_ERROR, str(e))
+        return AuthResult(
+            False, AuthErrorType.SYSTEM_ERROR, "Unexpected system failure"
+        )
 
 
 # TODO: Need logging
@@ -92,4 +98,7 @@ async def login_controller(
 
     except Exception as e:
         logger.exception("System error: %s", str(e))
-        return AuthResult(False, AuthErrorType.SYSTEM_ERROR, str(e)), None
+        return (
+            AuthResult(False, AuthErrorType.SYSTEM_ERROR, "unexpected system failure"),
+            None,
+        )
