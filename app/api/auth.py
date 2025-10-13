@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 
 from .dependencies import get_app_db, get_current_user
 from ..models.request_models import LoginRequest, RegisterRequest
-from ..models.response_models import RegisterResponse, TokenResponse
+from ..models.response_models import RegisterResponse, TokenResponse, UserResponse
 from ..models.user import User
 from ..controllers.auth import (
     AuthResult,
@@ -40,7 +40,7 @@ async def login(req: LoginRequest, app_db: AppDatabase = Depends(get_app_db)):
 
 @router.get("/me", response_model=User)
 async def me(user: User = Depends(get_current_user)):
-    return User
+    return UserResponse(id=user.id, email=user.email)
 
 
 def _create_error_response(result: AuthResult) -> JSONResponse:

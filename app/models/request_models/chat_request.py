@@ -15,3 +15,11 @@ class ChatRequest(BaseModel):
         if not v.strip():
             raise ValueError("Field cannot be empty or only whitespace")
         return v.strip()
+
+    class Config:
+        json_schema = {
+            "example": {
+                "message": "Hi my name is Jarvis.",
+                "llm": "gpt-4o",
+            }
+        }

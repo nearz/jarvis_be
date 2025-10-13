@@ -1,3 +1,3 @@
-from .auth import RegisterResponse, TokenResponse
+from .auth import RegisterResponse, TokenResponse, UserResponse
 
-__all__ = ["RegisterResponse", "TokenResponse"]
+__all__ = ["RegisterResponse", "TokenResponse", "UserResponse"]

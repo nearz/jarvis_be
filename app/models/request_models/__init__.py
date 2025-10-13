@@ -1,5 +1,4 @@
 from .chat_request import ChatRequest
-from .login_request import LoginRequest
-from .register_request import RegisterRequest
+from .auth import LoginRequest, RegisterRequest
 
 __all__ = ["ChatRequest", "LoginRequest", "RegisterRequest"]
