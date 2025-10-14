@@ -59,11 +59,25 @@ class AppDatabase:
     async def create_user_thread(
         self, user_id: str, thread_id: str, title: Optional[str] = None
     ) -> bool:
+        if title is None:
+            title = "New Chat"
         try:
             await self.conn.execute(
                 """INSERT INTO user_threads (user_id, thread_id, title)
                 VALUES(?, ?, ?)""",
                 (user_id, thread_id, title),
+            )
+            await self.conn.commit()
+            return True
+        except aiosqlite.IntegrityError:
+            return False
+
+    async def set_thread_updated_at(self, user_id: str, thread_id: str) -> bool:
+        try:
+            await self.conn.execute(
+                """UPDATE user_threads SET updated_at = datetime('now')
+                WHERE user_id = ? AND thread_id = ?""",
+                (user_id, thread_id),
             )
             await self.conn.commit()
             return True

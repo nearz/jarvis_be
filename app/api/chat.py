@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from .dependencies import get_app_graph, get_graph_saver, get_current_user
+from .dependencies import get_app_graph, get_graph_saver, get_current_user, get_app_db
 from ..models.request_models import ChatRequest
 from ..models.user import User
 from ..controllers.chat import chat_controller, ChatErrorType, ChatResult
 from ..core.db_ops.agent_checkpoints_db import thread_exists
+from ..core.db_ops.app_db import AppDatabase
 from ..core.logging import get_logger
 
 
@@ -19,10 +20,13 @@ router = APIRouter()
 async def chat(
     req: ChatRequest,
     user: User = Depends(get_current_user),
+    app_db: AppDatabase = Depends(get_app_db),
     graph=Depends(get_app_graph),
 ):
     logger.info("New Chat | message len: %d | llm: %s", len(req.message), req.llm)
-    result = await chat_controller(req.message, req.llm, graph, thread_id=None)
+    result = await chat_controller(
+        req.message, req.llm, user.id, app_db, graph, thread_id=None
+    )
 
     if result.success:
         logger.info("Chat succesful | thread id: %s", result.thread_id)
@@ -48,6 +52,7 @@ async def chat_thread(
     thread_id: str,
     req: ChatRequest,
     user: User = Depends(get_current_user),
+    app_db: AppDatabase = Depends(get_app_db),
     graph=Depends(get_app_graph),
     saver=Depends(get_graph_saver),
 ):
@@ -66,7 +71,9 @@ async def chat_thread(
             },
         )
 
-    result = await chat_controller(req.message, req.llm, graph, thread_id=thread_id)
+    result = await chat_controller(
+        req.message, req.llm, user.id, app_db, graph, thread_id=thread_id
+    )
 
     if result.success:
         logger.info("Chat thread request succesful | thread_id: %s", thread_id)
@@ -94,6 +101,7 @@ def _create_error_response(result: ChatResult) -> JSONResponse:
     # Map error types to status codes
     status_code_map = {
         ChatErrorType.VALIDATION_ERROR: 400,
+        ChatErrorType.FORBIDDEN_ERROR: 403,
         ChatErrorType.GRAPH_EXECUTION_ERROR: 502,
         ChatErrorType.RESPONSE_PROCESSING_ERROR: 502,
         ChatErrorType.SYSTEM_ERROR: 500,

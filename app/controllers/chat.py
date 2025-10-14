@@ -8,12 +8,14 @@ from langgraph.graph.state import CompiledStateGraph, RunnableConfig
 
 from ..agent.state import AgentState, ContextSchema
 from ..core.db_ops.agent_checkpoints_db import thread_exists
+from ..core.db_ops.app_db import AppDatabase
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 class ChatErrorType(Enum):
+    FORBIDDEN_ERROR = "forbidden_error"
     VALIDATION_ERROR = "validation_error"
     LLM_ERROR = "llm_error"
     GRAPH_EXECUTION_ERROR = "graph_execution_error"
@@ -41,15 +43,32 @@ class ChatResult:
 async def chat_controller(
     message: str,
     llm: str,
+    user_id: str,
+    app_db: AppDatabase,
     graph: CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState],
     *,
     thread_id: Union[str, None],
 ) -> ChatResult:
     # New Chat does not provide a thread id, set one for new thread
+    new_thread = False
     if not thread_id:
         thread_id = str(uuid4())
+        new_thread = True
         logger.info("New thread created | thread_id: %s", thread_id)
     else:
+        vto_res = await app_db.verify_thread_ownership(user_id, thread_id)
+        if not vto_res:
+            logger.warning(
+                "User does not own this thread | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
+            return ChatResult(
+                success=False,
+                thread_id=thread_id,
+                error_type=ChatErrorType.FORBIDDEN_ERROR,
+                error_details="User does not own this thread",
+            )
         logger.info("Existing thread | thread_id: %s", thread_id)
 
     # Graph execution
@@ -63,8 +82,9 @@ async def chat_controller(
         config = RunnableConfig({"configurable": {"thread_id": thread_id}})
         context = ContextSchema(llm)
 
-        coro = graph.ainvoke({"messages": [msg]}, config=config, context=context)
-        result = await coro
+        result = await graph.ainvoke(
+            {"messages": [msg]}, config=config, context=context
+        )
 
         logger.info("Graph execution complete | thread_id: %s", thread_id)
 
@@ -130,6 +150,13 @@ async def chat_controller(
             thread_id,
             last_message.content[:400],
         )
+
+        # TODO: How to handle insert false
+        if new_thread:
+            res = await app_db.create_user_thread(user_id, thread_id)
+
+        # TODO: How to handle update false
+        ua_res = await app_db.set_thread_updated_at(user_id, thread_id)
 
         return ChatResult(
             success=True, message=last_message.content, thread_id=thread_id
