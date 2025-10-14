@@ -17,13 +17,6 @@ class AppDatabase:
         """
         Context manager for database transactions.
         Automatically commits on success, rolls back on error.
-
-        Usage:
-            async with self.transaction():
-                await self.conn.execute(...)
-                await self.conn.execute(...)
-                # Automatic commit if no exception
-                # Automatic rollback if exception occurs
         """
         try:
             yield
