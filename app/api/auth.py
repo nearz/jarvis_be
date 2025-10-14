@@ -20,21 +20,27 @@ router = APIRouter()
 
 @router.post("/register", response_model=RegisterResponse)
 async def register(req: RegisterRequest, app_db: AppDatabase = Depends(get_app_db)):
+    logger.info("Register request submitted")
     result = await register_controller(req.email, req.password, app_db)
 
     if result.success:
+        logger.info("user succesfully registered")
         return RegisterResponse(message="user registered.")
     else:
+        logger.warning("registration failed")
         return _create_error_response(result)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, app_db: AppDatabase = Depends(get_app_db)):
+    logger.info("login request")
     result, token = await login_controller(req.email, req.password, app_db)
 
     if result.success and token is not None:
+        logger.info("login succesful")
         return TokenResponse(token=token.token, token_type=token.token_type)
     else:
+        logger.warning("login failed")
         return _create_error_response(result)
 
 

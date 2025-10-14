@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from .dependencies import get_app_graph, get_graph_saver
+from .dependencies import get_app_graph, get_graph_saver, get_current_user
 from ..models.request_models import ChatRequest
+from ..models.user import User
 from ..controllers.chat import chat_controller, ChatErrorType, ChatResult
 from ..core.db_ops.agent_checkpoints_db import thread_exists
 from ..core.logging import get_logger
@@ -15,7 +16,11 @@ router = APIRouter()
 
 
 @router.post("/chat")
-async def chat(req: ChatRequest, graph=Depends(get_app_graph)):
+async def chat(
+    req: ChatRequest,
+    user: User = Depends(get_current_user),
+    graph=Depends(get_app_graph),
+):
     logger.info("New Chat | message len: %d | llm: %s", len(req.message), req.llm)
     result = await chat_controller(req.message, req.llm, graph, thread_id=None)
 
@@ -42,6 +47,7 @@ async def chat(req: ChatRequest, graph=Depends(get_app_graph)):
 async def chat_thread(
     thread_id: str,
     req: ChatRequest,
+    user: User = Depends(get_current_user),
     graph=Depends(get_app_graph),
     saver=Depends(get_graph_saver),
 ):

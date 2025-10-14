@@ -63,7 +63,7 @@ async def register_controller(
         return AuthResult(True)
 
     except Exception as e:
-        logger.exception("System error: %s", str(e))
+        logger.exception("System error")
         return AuthResult(
             False, AuthErrorType.SYSTEM_ERROR, "Unexpected system failure"
         )
@@ -80,6 +80,7 @@ async def login_controller(
         if user:
             pword_valid = verify_password(password, user["password"])
         else:
+            logger.warning("Invalid credentials")
             verify_password(password, "$argon2id$v=19$m=65536,t=3,p=4$dummy")
             pword_valid = False
 
@@ -92,6 +93,8 @@ async def login_controller(
                 None,
             )
 
+        await app_db.set_last_login(user["id"])
+        logger.info("succesful login: %s", user["id"])
         token = encode_token({"sub": user["id"]})
 
         return AuthResult(True), Token(token=token, token_type="bearer")
