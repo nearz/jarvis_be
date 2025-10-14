@@ -1,5 +1,6 @@
 import aiosqlite
 from typing import Optional, Dict, Any
+from contextlib import asynccontextmanager
 
 from ..logging import get_logger
 
@@ -11,14 +12,34 @@ class AppDatabase:
         self.conn = connection
         self.conn.row_factory = aiosqlite.Row
 
+    @asynccontextmanager
+    async def transaction(self):
+        """
+        Context manager for database transactions.
+        Automatically commits on success, rolls back on error.
+
+        Usage:
+            async with self.transaction():
+                await self.conn.execute(...)
+                await self.conn.execute(...)
+                # Automatic commit if no exception
+                # Automatic rollback if exception occurs
+        """
+        try:
+            yield
+            await self.conn.commit()
+        except Exception:
+            await self.conn.rollback()
+            raise
+
     async def create_user(self, user_id: str, email: str, password: str) -> bool:
         try:
-            await self.conn.execute(
-                """INSERT INTO users (id, email, password)
-                VALUES (?, ?, ?)""",
-                (user_id, email, password),
-            )
-            await self.conn.commit()
+            async with self.transaction():
+                await self.conn.execute(
+                    """INSERT INTO users (id, email, password)
+                    VALUES (?, ?, ?)""",
+                    (user_id, email, password),
+                )
             return True
         except aiosqlite.IntegrityError:
             return False
@@ -48,10 +69,11 @@ class AppDatabase:
 
     async def set_last_login(self, user_id: str) -> bool:
         try:
-            await self.conn.execute(
-                "UPDATE users SET last_login = datetime('now') WHERE id = ?", (user_id,)
-            )
-            await self.conn.commit()
+            async with self.transaction():
+                await self.conn.execute(
+                    "UPDATE users SET last_login = datetime('now') WHERE id = ?",
+                    (user_id,),
+                )
             return True
         except aiosqlite.IntegrityError:
             return False
@@ -62,24 +84,24 @@ class AppDatabase:
         if title is None:
             title = "New Chat"
         try:
-            await self.conn.execute(
-                """INSERT INTO user_threads (user_id, thread_id, title)
-                VALUES(?, ?, ?)""",
-                (user_id, thread_id, title),
-            )
-            await self.conn.commit()
+            async with self.transaction():
+                await self.conn.execute(
+                    """INSERT INTO user_threads (user_id, thread_id, title)
+                    VALUES(?, ?, ?)""",
+                    (user_id, thread_id, title),
+                )
             return True
         except aiosqlite.IntegrityError:
             return False
 
     async def set_thread_updated_at(self, user_id: str, thread_id: str) -> bool:
         try:
-            await self.conn.execute(
-                """UPDATE user_threads SET updated_at = datetime('now')
-                WHERE user_id = ? AND thread_id = ?""",
-                (user_id, thread_id),
-            )
-            await self.conn.commit()
+            async with self.transaction():
+                await self.conn.execute(
+                    """UPDATE user_threads SET updated_at = datetime('now')
+                    WHERE user_id = ? AND thread_id = ?""",
+                    (user_id, thread_id),
+                )
             return True
         except aiosqlite.IntegrityError:
             return False
@@ -96,7 +118,7 @@ class AppDatabase:
 
 # TODO: Consider saving chat history to mirror langgraph checkpoints db
 async def init_app_db(conn: aiosqlite.Connection):
-    await conn.execute("PRAGMA foreigh_keys = ON")
+    await conn.execute("PRAGMA foreign_keys = ON")
     await conn.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
