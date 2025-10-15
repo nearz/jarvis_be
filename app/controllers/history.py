@@ -40,7 +40,13 @@ async def history_controller(user_id: str, app_db: AppDatabase) -> HistoryResult
             return HistoryResult(success=True)
 
         threads = [
-            Thread(title=t["title"], thread_id=t["thread_id"]) for t in threads_db
+            Thread(
+                title=t["title"],
+                thread_id=t["thread_id"],
+                created_at=t["created_at"],
+                updated_at=t["updated_at"],
+            )
+            for t in threads_db
         ]
         logger.info(
             "Thread history fetched | user_id: %s | thread count: %d",

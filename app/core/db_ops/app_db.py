@@ -64,7 +64,7 @@ class AppDatabase:
         try:
             async with self.transaction():
                 await self.conn.execute(
-                    "UPDATE users SET last_login = datetime('now') WHERE id = ?",
+                    "UPDATE users SET last_login = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE id = ?",
                     (user_id,),
                 )
             return True
@@ -98,7 +98,7 @@ class AppDatabase:
         try:
             async with self.transaction():
                 await self.conn.execute(
-                    """UPDATE user_threads SET updated_at = datetime('now')
+                    """UPDATE user_threads SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
                     WHERE user_id = ? AND thread_id = ?""",
                     (user_id, thread_id),
                 )
@@ -127,7 +127,7 @@ async def init_app_db(conn: aiosqlite.Connection):
         password TEXT NOT NULL,
         is_active BOOLEAN DEFAULT 1,
         last_login TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
         )
         """
     )
@@ -140,7 +140,7 @@ async def init_app_db(conn: aiosqlite.Connection):
         thread_id TEXT NOT NULL,
         title TEXT DEFAULT 'New Chat',
         updated_at TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')), 
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), 
         FOREIGN KEY (user_id) REFERENCES users(id) on DELETE CASCADE,
         UNIQUE(user_id, thread_id)
         )
