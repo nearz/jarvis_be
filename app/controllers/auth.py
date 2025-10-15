@@ -3,6 +3,7 @@ from typing import Optional, Union
 from enum import Enum
 from pydantic import BaseModel
 
+from ..models import Token
 from ..core.logging import get_logger
 from ..core.db_ops.app_db import AppDatabase
 from ..core.auth.password import hash_password, verify_password
@@ -17,19 +18,16 @@ class AuthErrorType(Enum):
     SYSTEM_ERROR = "system_error"
 
 
-class Token(BaseModel):
-    token: str
-    token_type: str
-
-
 class AuthResult:
     def __init__(
         self,
         success: bool,
+        token: Optional[Token] = None,
         error_type: Optional[AuthErrorType] = None,
         error_details: Optional[str] = None,
     ):
         self.success = success
+        self.token = token
         self.error_type = error_type
         self.error_details = error_details
 
@@ -46,7 +44,9 @@ async def register_controller(
         if await app_db.user_email_exists(email):
             logger.warning("Cannot register, existing user")
             return AuthResult(
-                False, AuthErrorType.AUTHORIZATION_ERROR, "Cannot register user"
+                success=False,
+                error_type=AuthErrorType.AUTHORIZATION_ERROR,
+                error_details="Cannot register user",
             )
 
         new_user_id = str(uuid.uuid4())
@@ -56,23 +56,26 @@ async def register_controller(
         if not res:
             logger.warning("Database error occured")
             return AuthResult(
-                False, AuthErrorType.DATABASE_ERROR, "database access error"
+                success=False,
+                error_type=AuthErrorType.DATABASE_ERROR,
+                error_details="database access error",
             )
 
         logger.info("User registered")
-        return AuthResult(True)
+        return AuthResult(success=True)
 
     except Exception as e:
         logger.exception("System error")
         return AuthResult(
-            False, AuthErrorType.SYSTEM_ERROR, "Unexpected system failure"
+            success=False,
+            error_type=AuthErrorType.SYSTEM_ERROR,
+            error_details="Unexpected system failure",
         )
 
 
-# TODO: Need logging
 async def login_controller(
     email: str, password: str, app_db: AppDatabase
-) -> tuple[AuthResult, Union[Token, None]]:
+) -> AuthResult:
 
     try:
         user = await app_db.get_user_by_email(email)
@@ -86,22 +89,22 @@ async def login_controller(
 
         if not pword_valid:
             logger.warning("Invalid credentials")
-            return (
-                AuthResult(
-                    False, AuthErrorType.AUTHORIZATION_ERROR, "Invalid credentials"
-                ),
-                None,
+            return AuthResult(
+                success=False,
+                error_type=AuthErrorType.AUTHORIZATION_ERROR,
+                error_details="Invalid credentials",
             )
 
         await app_db.set_last_login(user["id"])
         logger.info("succesful login: %s", user["id"])
         token = encode_token({"sub": user["id"]})
 
-        return AuthResult(True), Token(token=token, token_type="bearer")
+        return AuthResult(success=True, token=Token(token=token, token_type="bearer"))
 
     except Exception as e:
         logger.exception("System error: %s", str(e))
-        return (
-            AuthResult(False, AuthErrorType.SYSTEM_ERROR, "unexpected system failure"),
-            None,
+        return AuthResult(
+            success=False,
+            error_type=AuthErrorType.SYSTEM_ERROR,
+            error_details="unexpected system failure",
         )

@@ -9,6 +9,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .api.chat import router as chat_router
 from .api.auth import router as auth_router
+from .api.history import router as history_router
 from .agent.state import build_graph
 from .agent.tavily_client import get_async_tavily_client, MissingApiKey
 from .core.config import settings
@@ -71,6 +72,7 @@ app.add_middleware(
 
 app.include_router(chat_router)
 app.include_router(auth_router)
+app.include_router(history_router)
 
 
 @app.get("/")

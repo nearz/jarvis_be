@@ -1,5 +1,5 @@
 import aiosqlite
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 from contextlib import asynccontextmanager
 
 from ..logging import get_logger
@@ -37,7 +37,7 @@ class AppDatabase:
         except aiosqlite.IntegrityError:
             return False
 
-    async def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+    async def get_user_by_email(self, email: str) -> Optional[dict[str, Any]]:
         async with self.conn.execute(
             "SELECT * FROM users WHERE email = ?", (email,)
         ) as cursor:
@@ -53,7 +53,7 @@ class AppDatabase:
             res = await cursor.fetchone()
             return res is not None
 
-    async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user_by_id(self, user_id: str) -> Optional[dict[str, Any]]:
         async with self.conn.execute(
             "SELECT * FROM users WHERE id = ?", (user_id,)
         ) as cursor:
@@ -86,6 +86,13 @@ class AppDatabase:
             return True
         except aiosqlite.IntegrityError:
             return False
+
+    async def get_user_threads(self, user_id: str) -> Optional[list[dict[str, Any]]]:
+        async with self.conn.execute(
+            "SELECT * FROM user_threads WHERE user_id = ?", (user_id,)
+        ) as cursor:
+            res = await cursor.fetchall()
+            return [dict(row) for row in res] if res else None
 
     async def set_thread_updated_at(self, user_id: str, thread_id: str) -> bool:
         try:

@@ -3,7 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from ..core.db_ops.app_db import AppDatabase
 from ..core.auth.token import decode_token
-from ..models.user import User
+from ..models import User
 
 security = HTTPBearer()
 

@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from .dependencies import get_app_db, get_current_user
 from ..models.request_models import LoginRequest, RegisterRequest
 from ..models.response_models import RegisterResponse, TokenResponse, UserResponse
-from ..models.user import User
+from ..models import User
 from ..controllers.auth import (
     AuthResult,
     AuthErrorType,
@@ -34,11 +34,13 @@ async def register(req: RegisterRequest, app_db: AppDatabase = Depends(get_app_d
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, app_db: AppDatabase = Depends(get_app_db)):
     logger.info("login request")
-    result, token = await login_controller(req.email, req.password, app_db)
+    result = await login_controller(req.email, req.password, app_db)
 
-    if result.success and token is not None:
+    if result.success and result.token is not None:
         logger.info("login succesful")
-        return TokenResponse(token=token.token, token_type=token.token_type)
+        return TokenResponse(
+            token=result.token.token, token_type=result.token.token_type
+        )
     else:
         logger.warning("login failed")
         return _create_error_response(result)

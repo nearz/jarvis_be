@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 
 from .dependencies import get_app_graph, get_graph_saver, get_current_user, get_app_db
 from ..models.request_models import ChatRequest
-from ..models.user import User
+from ..models import User
 from ..controllers.chat import chat_controller, ChatErrorType, ChatResult
 from ..core.db_ops.agent_checkpoints_db import thread_exists
 from ..core.db_ops.app_db import AppDatabase
