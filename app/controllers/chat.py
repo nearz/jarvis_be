@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 class ChatErrorType(Enum):
     FORBIDDEN_ERROR = "forbidden_error"
     VALIDATION_ERROR = "validation_error"
+    DATABASE_ERROR = "database_error"
     LLM_ERROR = "llm_error"
     GRAPH_EXECUTION_ERROR = "graph_execution_error"
     RESPONSE_PROCESSING_ERROR = "response_processing_error"
@@ -146,7 +147,7 @@ async def chat_controller(
             )
 
         logger.info(
-            "Graph executed succesfully | thread_id: %s | AI message preview: %s",
+            "Graph executed successfully | thread_id: %s | AI message preview: %s",
             thread_id,
             last_message.content[:400],
         )
@@ -154,9 +155,20 @@ async def chat_controller(
         # TODO: How to handle insert false
         if new_thread:
             res = await app_db.create_user_thread(user_id, thread_id)
+            if not res:
+                logger.error(
+                    "Failed to create user thread | user_id: %s | thread_id: %s",
+                    user_id,
+                    thread_id,
+                )
+                return ChatResult(
+                    success=False,
+                    thread_id=thread_id,
+                    error_type=ChatErrorType.DATABASE_ERROR,
+                    error_details="Failed to save conversation thread",
+                )
 
-        # TODO: How to handle update false
-        ua_res = await app_db.set_thread_updated_at(user_id, thread_id)
+        await app_db.set_thread_updated_at(user_id, thread_id)
 
         return ChatResult(
             success=True, message=last_message.content, thread_id=thread_id

@@ -40,7 +40,7 @@ async def get_current_user(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="Unexpected error during authenitcation",
+            detail="Unexpected error during authentication",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

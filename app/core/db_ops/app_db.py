@@ -21,8 +21,14 @@ class AppDatabase:
         try:
             yield
             await self.conn.commit()
-        except Exception:
-            await self.conn.rollback()
+        except BaseException as e:
+            logger.debug(
+                "Database transaction failed, rolling back: %s", type(e).__name__
+            )
+            try:
+                await self.conn.rollback()
+            except Exception as rollback_error:
+                logger.exception("Rollback failed: %s", rollback_error)
             raise
 
     async def create_user(self, user_id: str, email: str, password: str) -> bool:
@@ -89,7 +95,9 @@ class AppDatabase:
 
     async def get_user_threads(self, user_id: str) -> Optional[list[dict[str, Any]]]:
         async with self.conn.execute(
-            "SELECT * FROM user_threads WHERE user_id = ?", (user_id,)
+            """SELECT * FROM user_threads WHERE user_id = ?
+            ORDER BY updated_at DESC, created_at DESC""",
+            (user_id,),
         ) as cursor:
             res = await cursor.fetchall()
             return [dict(row) for row in res] if res else None
@@ -139,7 +147,7 @@ async def init_app_db(conn: aiosqlite.Connection):
         user_id TEXT NOT NULL,
         thread_id TEXT NOT NULL,
         title TEXT DEFAULT 'New Chat',
-        updated_at TEXT,
+        updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), 
         FOREIGN KEY (user_id) REFERENCES users(id) on DELETE CASCADE,
         UNIQUE(user_id, thread_id)
@@ -148,7 +156,6 @@ async def init_app_db(conn: aiosqlite.Connection):
     )
 
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_email ON users(email)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_id ON users(id)")
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_user_threads_user_id ON user_threads(user_id)"
     )

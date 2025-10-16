@@ -13,7 +13,7 @@ from ..core.logging import get_logger
 logger = get_logger(__name__)
 router = APIRouter()
 
-# TODO: Add pydantic response models, if applicable with streaming.
+# TODO: Stream chat response.
 
 
 @router.post("/chat")
@@ -29,7 +29,7 @@ async def chat(
     )
 
     if result.success:
-        logger.info("Chat succesful | thread id: %s", result.thread_id)
+        logger.info("Chat successful | thread id: %s", result.thread_id)
         return JSONResponse(
             status_code=200,
             content={
@@ -76,7 +76,7 @@ async def chat_thread(
     )
 
     if result.success:
-        logger.info("Chat thread request succesful | thread_id: %s", thread_id)
+        logger.info("Chat thread request successful | thread_id: %s", thread_id)
         return JSONResponse(
             status_code=200,
             content={
@@ -102,6 +102,7 @@ def _create_error_response(result: ChatResult) -> JSONResponse:
     status_code_map = {
         ChatErrorType.VALIDATION_ERROR: 400,
         ChatErrorType.FORBIDDEN_ERROR: 403,
+        ChatErrorType.DATABASE_ERROR: 500,
         ChatErrorType.GRAPH_EXECUTION_ERROR: 502,
         ChatErrorType.RESPONSE_PROCESSING_ERROR: 502,
         ChatErrorType.SYSTEM_ERROR: 500,

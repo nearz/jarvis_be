@@ -24,7 +24,7 @@ async def register(req: RegisterRequest, app_db: AppDatabase = Depends(get_app_d
     result = await register_controller(req.email, req.password, app_db)
 
     if result.success:
-        logger.info("user succesfully registered")
+        logger.info("user successfully registered")
         return RegisterResponse(message="user registered.")
     else:
         logger.warning("registration failed")
@@ -37,7 +37,7 @@ async def login(req: LoginRequest, app_db: AppDatabase = Depends(get_app_db)):
     result = await login_controller(req.email, req.password, app_db)
 
     if result.success and result.token is not None:
-        logger.info("login succesful")
+        logger.info("login successful")
         return TokenResponse(
             token=result.token.token, token_type=result.token.token_type
         )
@@ -46,7 +46,7 @@ async def login(req: LoginRequest, app_db: AppDatabase = Depends(get_app_db)):
         return _create_error_response(result)
 
 
-@router.get("/me", response_model=User)
+@router.get("/me", response_model=UserResponse)
 async def me(user: User = Depends(get_current_user)):
     return UserResponse(id=user.id, email=user.email)
 

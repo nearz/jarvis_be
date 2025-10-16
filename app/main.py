@@ -1,4 +1,3 @@
-import uuid
 from contextlib import asynccontextmanager
 import logging
 import aiosqlite
@@ -40,7 +39,7 @@ async def lifespan(app: FastAPI):
             raise RuntimeError("Tavily API key not set.")
 
     except Exception as e:
-        logger.exception(f"Failed to initialize application: %s", e)
+        logger.exception("Failed to initialize application: %s", e)
         raise
 
     logger.info("Application Started | Version %s", app.version)

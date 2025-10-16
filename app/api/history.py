@@ -20,7 +20,7 @@ async def chat(
     result = await history_controller(user.id, app_db)
 
     if result.success:
-        logger.info("History succesfully fetched")
+        logger.info("History successfully fetched")
         if result.threads:
             return HistoryResponse(threads=result.threads)
         else:
