@@ -90,13 +90,13 @@ async def login_controller(
         user = await app_db.get_user_by_email(email)
 
         if user:
-            pword_valid = verify_password(password, user["password"])
+            stored_hash = user["password"]
         else:
-            logger.warning("Invalid credentials")
-            verify_password(password, "$argon2id$v=19$m=65536,t=3,p=4$dummy")
-            pword_valid = False
+            stored_hash = "$argon2id$v=19$m=65536,t=3,p=4$Kxe9asgS7lH9J5nM/cofkA$4DmKyLnrHIAMmdIv1uLsFq2wIKojh6kP8r/IkVQ6byw"
 
-        if not pword_valid:
+        valid_pwd = verify_password(password, stored_hash)
+
+        if not user or not valid_pwd:
             logger.warning("Invalid credentials")
             return AuthResult(
                 success=False,
@@ -115,7 +115,10 @@ async def login_controller(
 
     except DatabaseException as e:
         logger.exception("Database exception occured | error: %s", str(e))
-        verify_password(password, "$argon2id$v=19$m=65536,t=3,p=4$dummy")
+        verify_password(
+            password,
+            "$argon2id$v=19$m=65536,t=3,p=4$Kxe9asgS7lH9J5nM/cofkA$4DmKyLnrHIAMmdIv1uLsFq2wIKojh6kP8r/IkVQ6byw",
+        )
         return AuthResult(
             success=False,
             error_type=AuthErrorType.DATABASE_ERROR,
