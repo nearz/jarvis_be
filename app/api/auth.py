@@ -57,7 +57,7 @@ def _create_error_response(result: AuthResult) -> JSONResponse:
     """
     status_code_map = {
         AuthErrorType.AUTHORIZATION_ERROR: 401,
-        AuthErrorType.DATABASE_ERROR: 500,
+        AuthErrorType.DATABASE_ERROR: 503,
         AuthErrorType.SYSTEM_ERROR: 500,
     }
 

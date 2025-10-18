@@ -7,6 +7,13 @@ from ..logging import get_logger
 logger = get_logger(__name__)
 
 
+class DatabaseException(Exception):
+    """Raised when database operation fails"""
+
+    pass
+
+
+# TODO: Consider changes when moving to Postgres
 class AppDatabase:
     def __init__(self, connection: aiosqlite.Connection):
         self.conn = connection
@@ -41,31 +48,114 @@ class AppDatabase:
                 )
             return True
         except aiosqlite.IntegrityError:
+            logger.debug(
+                "User creation failed - integrity constraint | email: %s", email
+            )
             return False
-
-    async def get_user_by_email(self, email: str) -> Optional[dict[str, Any]]:
-        async with self.conn.execute(
-            "SELECT * FROM users WHERE email = ?", (email,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            return dict(row) if row else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "User creation failed - operational error | email: %s | error: %s",
+                email,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "User creation failed - database error | email: %s | error: %s",
+                email,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "User creation failed - unexpected error | email: %s", email
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
 
     async def user_email_exists(self, email: str) -> bool:
-        async with self.conn.execute(
-            """SELECT 1 FROM users
-            WHERE email = ?""",
-            (email,),
-        ) as cursor:
-            res = await cursor.fetchone()
-            return res is not None
+        try:
+            async with self.conn.execute(
+                """SELECT 1 FROM users
+                WHERE email = ?""",
+                (email,),
+            ) as cursor:
+                res = await cursor.fetchone()
+                return res is not None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "User email exists check failed - operational error | email: %s | error: %s",
+                email,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "User email exists check failed - database error | email: %s | error: %s",
+                email,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "User email exists check failed - unexpected error | email: %s", email
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def get_user_by_email(self, email: str) -> Optional[dict[str, Any]]:
+        try:
+            async with self.conn.execute(
+                "SELECT * FROM users WHERE email = ?", (email,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get user by email failed - operational error | email: %s | error: %s",
+                email,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get user by email failed - database error | email: %s | error: %s",
+                email,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get user by email failed - unexpected error | email: %s", email
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
 
     async def get_user_by_id(self, user_id: str) -> Optional[dict[str, Any]]:
-        async with self.conn.execute(
-            "SELECT * FROM users WHERE id = ?", (user_id,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            return dict(row) if row else None
+        try:
+            async with self.conn.execute(
+                "SELECT * FROM users WHERE id = ?", (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get user by id failed - operational error | user_id: %s | error: %s",
+                user_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get user by id failed - database error | user_id: %s | error: %s",
+                user_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get user by id failed - unexpected error | user_id: %s", user_id
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
 
+    # No DatabaseExceptions: Leave as return False for any exceptions so does not block login.
     async def set_last_login(self, user_id: str) -> bool:
         try:
             async with self.transaction():
@@ -75,6 +165,28 @@ class AppDatabase:
                 )
             return True
         except aiosqlite.IntegrityError:
+            logger.debug(
+                "Set last login failed - integrity constraint | user_id: %s", user_id
+            )
+            return False
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Set last login failed - operational error | user_id: %s | error: %s",
+                user_id,
+                str(e),
+            )
+            return False
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Set last login failed - database error | user_id: %s | error: %s",
+                user_id,
+                str(e),
+            )
+            return False
+        except Exception as e:
+            logger.exception(
+                "Set last login failed - unexpected error | user_id: %s", user_id
+            )
             return False
 
     async def create_user_thread(
@@ -91,17 +203,66 @@ class AppDatabase:
                 )
             return True
         except aiosqlite.IntegrityError:
+            logger.debug(
+                "Create user thread failed - integrity constraint | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
             return False
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Create user thread failed - operational error | user_id: %s | thread_id: %s | error: %s",
+                user_id,
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Create user thread failed - database error | user_id: %s | thread_id: %s | error: %s",
+                user_id,
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Create user thread failed - unexpected error | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
 
     async def get_user_threads(self, user_id: str) -> Optional[list[dict[str, Any]]]:
-        async with self.conn.execute(
-            """SELECT * FROM user_threads WHERE user_id = ?
-            ORDER BY updated_at DESC, created_at DESC""",
-            (user_id,),
-        ) as cursor:
-            res = await cursor.fetchall()
-            return [dict(row) for row in res] if res else None
+        try:
+            async with self.conn.execute(
+                """SELECT * FROM user_threads WHERE user_id = ?
+                ORDER BY updated_at DESC, created_at DESC""",
+                (user_id,),
+            ) as cursor:
+                res = await cursor.fetchall()
+                return [dict(row) for row in res] if res else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get user threads failed - operational error | user_id: %s | error: %s",
+                user_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get user threads failed - database error | user_id: %s | error: %s",
+                user_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get user threads failed - unexpected error | user_id: %s", user_id
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
 
+    # No DatabaseExceptions: Leave as return False for any exceptions so does not block login.
     async def set_thread_updated_at(self, user_id: str, thread_id: str) -> bool:
         try:
             async with self.transaction():
@@ -112,16 +273,68 @@ class AppDatabase:
                 )
             return True
         except aiosqlite.IntegrityError:
+            logger.debug(
+                "Set thread updated_at failed - integrity constraint | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
+            return False
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Set thread updated_at failed - operational error | user_id: %s | thread_id: %s | error: %s",
+                user_id,
+                thread_id,
+                str(e),
+            )
+            return False
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Set thread updated_at failed - database error | user_id: %s | thread_id: %s | error: %s",
+                user_id,
+                thread_id,
+                str(e),
+            )
+            return False
+        except Exception as e:
+            logger.exception(
+                "Set thread updated_at failed - unexpected error | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
             return False
 
     async def verify_thread_ownership(self, user_id: str, thread_id: str) -> bool:
-        async with self.conn.execute(
-            """SELECT 1 FROM user_threads
-            WHERE user_id = ? AND thread_id = ?""",
-            (user_id, thread_id),
-        ) as cursor:
-            res = await cursor.fetchone()
-            return res is not None
+        try:
+            async with self.conn.execute(
+                """SELECT 1 FROM user_threads
+                WHERE user_id = ? AND thread_id = ?""",
+                (user_id, thread_id),
+            ) as cursor:
+                res = await cursor.fetchone()
+                return res is not None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Verify thread ownership failed - operational error | user_id: %s | thread_id: %s | error: %s",
+                user_id,
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Verify thread ownership failed - database error | user_id: %s | thread_id: %s | error: %s",
+                user_id,
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Verify thread ownership failed - unexpected error | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
 
 
 # TODO: Consider saving chat history to mirror langgraph checkpoints db

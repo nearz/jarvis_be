@@ -1,7 +1,7 @@
 from fastapi import Request, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from ..core.db_ops.app_db import AppDatabase
+from ..core.db_ops.app_db import AppDatabase, DatabaseException
 from ..core.auth.token import decode_token
 from ..models import User
 
@@ -53,12 +53,19 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user = await app_db.get_user_by_id(user_id)
+    try:
+        user = await app_db.get_user_by_id(user_id)
+    except DatabaseException as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Database temporarily unavailable",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     if not user:
         raise HTTPException(
             status_code=401,
-            detail="User not found",
+            detail="Authentication Error",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

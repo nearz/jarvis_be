@@ -8,7 +8,7 @@ from langgraph.graph.state import CompiledStateGraph, RunnableConfig
 
 from ..agent.state import AgentState, ContextSchema
 from ..core.db_ops.agent_checkpoints_db import thread_exists
-from ..core.db_ops.app_db import AppDatabase
+from ..core.db_ops.app_db import AppDatabase, DatabaseException
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -57,7 +57,21 @@ async def chat_controller(
         new_thread = True
         logger.info("New thread created | thread_id: %s", thread_id)
     else:
-        vto_res = await app_db.verify_thread_ownership(user_id, thread_id)
+        try:
+            vto_res = await app_db.verify_thread_ownership(user_id, thread_id)
+        except DatabaseException as e:
+            logger.exception(
+                "Database exception occured | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
+            return ChatResult(
+                success=False,
+                thread_id=thread_id,
+                error_type=ChatErrorType.DATABASE_ERROR,
+                error_details="Database exception occured",
+            )
+
         if not vto_res:
             logger.warning(
                 "User does not own this thread | user_id: %s | thread_id: %s",
@@ -168,10 +182,25 @@ async def chat_controller(
                     error_details="Failed to save conversation thread",
                 )
 
-        await app_db.set_thread_updated_at(user_id, thread_id)
+        tua_res = await app_db.set_thread_updated_at(user_id, thread_id)
+        if not tua_res:
+            logger.warning(
+                "Thread updated at failure | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
 
         return ChatResult(
             success=True, message=last_message.content, thread_id=thread_id
+        )
+
+    except DatabaseException as e:
+        logger.exception("Database exception occured | thread_id: %s", thread_id)
+        return ChatResult(
+            success=False,
+            thread_id=thread_id,
+            error_type=ChatErrorType.DATABASE_ERROR,
+            error_details="Database exception occured",
         )
 
     except Exception as e:

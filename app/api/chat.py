@@ -102,7 +102,7 @@ def _create_error_response(result: ChatResult) -> JSONResponse:
     status_code_map = {
         ChatErrorType.VALIDATION_ERROR: 400,
         ChatErrorType.FORBIDDEN_ERROR: 403,
-        ChatErrorType.DATABASE_ERROR: 500,
+        ChatErrorType.DATABASE_ERROR: 503,
         ChatErrorType.GRAPH_EXECUTION_ERROR: 502,
         ChatErrorType.RESPONSE_PROCESSING_ERROR: 502,
         ChatErrorType.SYSTEM_ERROR: 500,

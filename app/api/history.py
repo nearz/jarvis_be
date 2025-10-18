@@ -37,7 +37,7 @@ def _create_error_response(result: HistoryResult) -> JSONResponse:
     """
     status_code_map = {
         HistoryErrorType.AUTHORIZATION_ERROR: 401,
-        HistoryErrorType.DATABASE_ERROR: 500,
+        HistoryErrorType.DATABASE_ERROR: 503,
         HistoryErrorType.SYSTEM_ERROR: 500,
     }
 

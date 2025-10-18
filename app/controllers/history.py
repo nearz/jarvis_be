@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-from ..core.db_ops.app_db import AppDatabase
+from ..core.db_ops.app_db import AppDatabase, DatabaseException
 from ..models import Thread
 from ..core.logging import get_logger
 
@@ -55,6 +55,14 @@ async def history_controller(user_id: str, app_db: AppDatabase) -> HistoryResult
         )
 
         return HistoryResult(success=True, threads=threads)
+
+    except DatabaseException as e:
+        logger.exception("Database exception occured | user_id: %s", user_id)
+        return HistoryResult(
+            success=False,
+            error_type=HistoryErrorType.DATABASE_ERROR,
+            error_details="Database exception occured",
+        )
 
     except Exception as e:
         logger.exception("System error")

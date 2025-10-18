@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from ..models import Token
 from ..core.logging import get_logger
-from ..core.db_ops.app_db import AppDatabase
+from ..core.db_ops.app_db import AppDatabase, DatabaseException
 from ..core.auth.password import hash_password, verify_password
 from ..core.auth.token import encode_token
 
@@ -42,7 +42,7 @@ async def register_controller(
 
     try:
         if await app_db.user_email_exists(email):
-            logger.warning("Cannot register, existing user")
+            logger.warning("Registration failure")
             return AuthResult(
                 success=False,
                 error_type=AuthErrorType.AUTHORIZATION_ERROR,
@@ -51,18 +51,27 @@ async def register_controller(
 
         new_user_id = str(uuid.uuid4())
         hsh_pwrd = hash_password(password)
+
         res = await app_db.create_user(new_user_id, email, hsh_pwrd)
 
         if not res:
-            logger.warning("Database error occured")
+            logger.warning("Registration failure")
             return AuthResult(
                 success=False,
-                error_type=AuthErrorType.DATABASE_ERROR,
-                error_details="database access error",
+                error_type=AuthErrorType.AUTHORIZATION_ERROR,
+                error_details="Cannot register user",
             )
 
         logger.info("User registered")
         return AuthResult(success=True)
+
+    except DatabaseException as e:
+        logger.exception("Database exception occured | error: %s", str(e))
+        return AuthResult(
+            success=False,
+            error_type=AuthErrorType.DATABASE_ERROR,
+            error_details="Database exception occured",
+        )
 
     except Exception as e:
         logger.exception("System error")
@@ -95,11 +104,23 @@ async def login_controller(
                 error_details="Invalid credentials",
             )
 
-        await app_db.set_last_login(user["id"])
+        sll_res = await app_db.set_last_login(user["id"])
+        if not sll_res:
+            logger.warning("Last login write failed | user_id: %s", user["id"])
+
         logger.info("succesful login: %s", user["id"])
         token = encode_token({"sub": user["id"]})
 
         return AuthResult(success=True, token=Token(token=token, token_type="bearer"))
+
+    except DatabaseException as e:
+        logger.exception("Database exception occured | error: %s", str(e))
+        verify_password(password, "$argon2id$v=19$m=65536,t=3,p=4$dummy")
+        return AuthResult(
+            success=False,
+            error_type=AuthErrorType.DATABASE_ERROR,
+            error_details="Database exception occured",
+        )
 
     except Exception as e:
         logger.exception("System error: %s", str(e))

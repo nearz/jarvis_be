@@ -3,6 +3,7 @@ checkpoints.db
 todo.md
 user.md
 trash.md
+tmp/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
