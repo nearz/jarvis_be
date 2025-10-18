@@ -190,10 +190,8 @@ class AppDatabase:
             return False
 
     async def create_user_thread(
-        self, user_id: str, thread_id: str, title: Optional[str] = None
+        self, user_id: str, thread_id: str, title: str
     ) -> bool:
-        if title is None:
-            title = "New Chat"
         try:
             async with self.transaction():
                 await self.conn.execute(

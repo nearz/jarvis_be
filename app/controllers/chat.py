@@ -7,6 +7,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph, RunnableConfig
 
 from ..agent.state import AgentState, ContextSchema
+from ..core.llm_utils.title_generator import generate_chat_title
 from ..core.db_ops.agent_checkpoints_db import thread_exists
 from ..core.db_ops.app_db import AppDatabase, DatabaseException
 from ..core.logging import get_logger
@@ -168,7 +169,8 @@ async def chat_controller(
 
         # TODO: How to handle insert false
         if new_thread:
-            res = await app_db.create_user_thread(user_id, thread_id)
+            title = await generate_chat_title(message, last_message.content)
+            res = await app_db.create_user_thread(user_id, thread_id, title)
             if not res:
                 logger.error(
                     "Failed to create user thread | user_id: %s | thread_id: %s",

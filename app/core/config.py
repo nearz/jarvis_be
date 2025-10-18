@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     TAVILY_API_KEY: str
 
+    DEFAULT_CHAT_TITLE: str = "Jarvis Chat"
+
     model_config = SettingsConfigDict(env_file=".env")
 
 
