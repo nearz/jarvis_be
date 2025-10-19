@@ -1,10 +1,16 @@
 import aiosqlite
+from enum import Enum
 from typing import Optional, Any
 from contextlib import asynccontextmanager
 
 from ..logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class MessageType(Enum):
+    USER = "user"
+    AI = "ai"
 
 
 class DatabaseException(Exception):
@@ -334,8 +340,119 @@ class AppDatabase:
             )
             raise DatabaseException(f"Unexpected database error: {e}") from e
 
+    async def create_thread_msg(
+        self, content: str, msg_type: str, msg_idx: int, msg_id: str, thread_id: str
+    ) -> bool:
+        try:
+            async with self.transaction():
+                await self.conn.execute(
+                    """INSERT INTO thread_messages 
+                    (content, message_type, message_index, message_id, thread_id)
+                    VALUES(?, ?, ?, ?, ?)""",
+                    (
+                        content,
+                        msg_type,
+                        msg_idx,
+                        msg_id,
+                        thread_id,
+                    ),
+                )
+            return True
+        except aiosqlite.IntegrityError as e:
+            logger.debug(
+                "Create thread message failed - integrity constraint | thread_id: %s | message_id: %s | error: %s",
+                thread_id,
+                msg_id,
+                str(e),
+            )
+            return False
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Create thread message failed - operational error | thread_id: %s | message_id: %s | error: %s",
+                thread_id,
+                msg_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Create thread message failed - database error | thread_id: %s | message_id: %s | error: %s",
+                thread_id,
+                msg_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Create thread message failed - unexpected error | thread_id: %s | message_id: %s",
+                thread_id,
+                msg_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
 
-# TODO: Consider saving chat history to mirror langgraph checkpoints db
+    async def get_thread_msg_last_idx(self, thread_id: str) -> int:
+        try:
+            async with self.conn.execute(
+                """SELECT message_index FROM thread_messages WHERE thread_id = ?
+                ORDER BY message_index DESC""",
+                (thread_id,),
+            ) as cursor:
+                res = await cursor.fetchone()
+                return int(res[0]) if res else 0
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get thread message last index failed - operational error | thread_id: %s | error: %s",
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get thread message last index failed - database error | thread_id: %s | error: %s",
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get thread message last index failed - unexpected error | thread_id: %s",
+                thread_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def get_thread_messages(
+        self, thread_id: str
+    ) -> Optional[list[dict[str, Any]]]:
+        try:
+            async with self.conn.execute(
+                """SELECT * FROM thread_messages WHERE thread_id = ?
+                ORDER BY message_index""",
+                (thread_id,),
+            ) as cursor:
+                res = await cursor.fetchall()
+                return [dict(row) for row in res] if res else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get thread messages failed - operational error | thread_id: %s | error: %s",
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get thread messages failed - database error | thread_id: %s | error: %s",
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get thread messages failed - unexpected error | thread_id: %s",
+                thread_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+
 async def init_app_db(conn: aiosqlite.Connection):
     await conn.execute("PRAGMA foreign_keys = ON")
     await conn.execute(
@@ -356,12 +473,28 @@ async def init_app_db(conn: aiosqlite.Connection):
         CREATE TABLE IF NOT EXISTS user_threads (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
-        thread_id TEXT NOT NULL,
+        thread_id TEXT UNIQUE NOT NULL,
         title TEXT DEFAULT 'New Chat',
         updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), 
-        FOREIGN KEY (user_id) REFERENCES users(id) on DELETE CASCADE,
-        UNIQUE(user_id, thread_id)
+        FOREIGN KEY (user_id) REFERENCES users(id) on DELETE CASCADE
+        )
+        """
+    )
+
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS thread_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_index INTEGER NOT NULL,
+        thread_id TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        message_type TEXT NOT NULL CHECK(message_type IN ('user', 'ai')),
+        content TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        FOREIGN KEY (thread_id) REFERENCES user_threads(thread_id) ON DELETE CASCADE,
+        UNIQUE(thread_id, message_id),
+        UNIQUE(thread_id, message_index)
         )
         """
     )
@@ -369,6 +502,12 @@ async def init_app_db(conn: aiosqlite.Connection):
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_email ON users(email)")
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_user_threads_user_id ON user_threads(user_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_threads_thread_id ON user_threads(thread_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_id ON thread_messages(thread_id)"
     )
 
     await conn.commit()

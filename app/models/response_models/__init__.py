@@ -1,4 +1,10 @@
 from .auth import RegisterResponse, TokenResponse, UserResponse
-from .history import HistoryResponse
+from .history import HistoryResponse, ThreadHistoryResponse
 
-__all__ = ["RegisterResponse", "TokenResponse", "UserResponse", "HistoryResponse"]
+__all__ = [
+    "RegisterResponse",
+    "TokenResponse",
+    "UserResponse",
+    "HistoryResponse",
+    "ThreadHistoryResponse",
+]

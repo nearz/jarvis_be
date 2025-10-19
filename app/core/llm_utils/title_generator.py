@@ -1,6 +1,7 @@
 from langchain_core.messages import HumanMessage, BaseMessage
 
 # from ..config import settings
+from .normalize import get_msg_content_text
 from .client import get_llm_client
 from .prompts import TITLE_GEN_PROMPT
 from ..config import settings
@@ -27,14 +28,7 @@ async def generate_chat_title(
 
         response = await client.ainvoke([HumanMessage(content=prompt)])
 
-        content = response.content
-        if isinstance(content, list):
-            logger.debug("Response content a list")
-            content = " ".join(
-                part["text"]
-                for part in content
-                if isinstance(part, dict) and "text" in part
-            )
+        content = get_msg_content_text(response.content)
         title = content.strip().strip('"').strip("'")
         logger.debug("Title generated: %s", title)
         return title or settings.DEFAULT_CHAT_TITLE

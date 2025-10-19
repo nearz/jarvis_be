@@ -3,13 +3,14 @@ from typing import Union, Optional
 from enum import Enum
 import logging
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langgraph.graph.state import CompiledStateGraph, RunnableConfig
 
 from ..agent.state import AgentState, ContextSchema
 from ..core.llm_utils.title_generator import generate_chat_title
+from ..core.llm_utils.normalize import get_msg_content_text
 from ..core.db_ops.agent_checkpoints_db import thread_exists
-from ..core.db_ops.app_db import AppDatabase, DatabaseException
+from ..core.db_ops.app_db import AppDatabase, DatabaseException, MessageType
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -192,6 +193,8 @@ async def chat_controller(
                 thread_id,
             )
 
+        await _save_msgs_to_db(messages, thread_id, app_db)
+
         return ChatResult(
             success=True, message=last_message.content, thread_id=thread_id
         )
@@ -205,11 +208,68 @@ async def chat_controller(
             error_details="Database exception occured",
         )
 
+    except ValueError as e:
+        logger.exception("Value error occured | error: %s", str(e))
+        return ChatResult(
+            success=False,
+            thread_id=thread_id,
+            error_type=ChatErrorType.VALIDATION_ERROR,
+            error_details=str(e),
+        )
+
     except Exception as e:
-        logger.exception("Graph execution failed | thread_id: %s", thread_id)
+        logger.exception(
+            "Graph execution failed | thread_id: %s | error: %s", thread_id, str(e)
+        )
         return ChatResult(
             success=False,
             thread_id=thread_id,
             error_type=ChatErrorType.RESPONSE_PROCESSING_ERROR,
             error_details="Failed to process AI response",
         )
+
+
+# TODO: How to handle types for .content and .id?
+async def _save_msgs_to_db(
+    messages: list[BaseMessage], thread_id: str, app_db: AppDatabase
+) -> None:
+    human_msg = _get_last_human_message(messages)
+    ai_msg = _get_last_ai_message(messages)
+
+    if not human_msg or not isinstance(human_msg.id, str):
+        raise ValueError("Invalid human message or missing message ID")
+
+    if not ai_msg or not isinstance(ai_msg.id, str):
+        raise ValueError("Invalid AI message or missing message ID")
+
+    last_index = await app_db.get_thread_msg_last_idx(thread_id)
+
+    await app_db.create_thread_msg(
+        get_msg_content_text(human_msg.content),
+        MessageType.USER.value,
+        last_index + 1,
+        human_msg.id,
+        thread_id,
+    )
+
+    await app_db.create_thread_msg(
+        get_msg_content_text(ai_msg.content),
+        MessageType.AI.value,
+        last_index + 2,
+        ai_msg.id,
+        thread_id,
+    )
+
+
+def _get_last_human_message(messages: list[BaseMessage]) -> Union[HumanMessage, None]:
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            return msg
+    return None
+
+
+def _get_last_ai_message(messages: list[BaseMessage]) -> Union[AIMessage, None]:
+    last_msg = messages[-1]
+    if isinstance(last_msg, AIMessage):
+        return last_msg
+    return None
