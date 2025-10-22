@@ -5,8 +5,8 @@ from typing import Union
 from .dependencies import (
     get_current_user,
     get_app_db,
-    get_graph_saver,
     thread_validation,
+    get_checkpoints_db,
 )
 from ..controllers.history import (
     history_controller,
@@ -20,7 +20,7 @@ from ..controllers.history import (
 from ..models import User, Thread
 from ..models.response_models import HistoryResponse, ThreadHistoryResponse
 from ..core.db_ops.app_db import AppDatabase
-from ..core.db_ops.agent_checkpoints_db import thread_exists
+from ..core.db_ops.agent_checkpoints_db import CheckpointDatabase
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -51,7 +51,6 @@ async def thread_message_history(
     thread_id: str = Depends(thread_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
-    saver=Depends(get_graph_saver),
 ):
     result = await thread_message_history_controller(user.id, thread_id, app_db)
 
@@ -77,9 +76,9 @@ async def delete_thread(
     thread_id: str = Depends(thread_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
-    saver=Depends(get_graph_saver),
+    checkpoints_db: CheckpointDatabase = Depends(get_checkpoints_db),
 ):
-    result = await delete_thread_controller(user.id, thread_id, app_db)
+    result = await delete_thread_controller(user.id, thread_id, app_db, checkpoints_db)
 
     if result.success:
         logger.info(

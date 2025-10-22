@@ -15,6 +15,10 @@ def get_app_graph(req: Request):
     return req.app.state.graph
 
 
+def get_checkpoints_db(req: Request):
+    return req.app.state.checkpoints_db
+
+
 def get_graph_saver(req: Request):
     return req.app.state.saver
 

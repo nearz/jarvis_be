@@ -11,7 +11,6 @@ from .dependencies import (
 from ..models.request_models import ChatRequest
 from ..models import User
 from ..controllers.chat import chat_controller, ChatErrorType, ChatResult
-from ..core.db_ops.agent_checkpoints_db import thread_exists
 from ..core.db_ops.app_db import AppDatabase
 from ..core.logging import get_logger
 
@@ -60,7 +59,6 @@ async def chat_thread(
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
     graph=Depends(get_app_graph),
-    saver=Depends(get_graph_saver),
 ):
     thread_id = thread_id.strip()
     logger.info("Chat thread request | thread_id: %s", thread_id)

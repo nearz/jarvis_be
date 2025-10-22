@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 
 from ..core.db_ops.app_db import AppDatabase, DatabaseException
+from ..core.db_ops.agent_checkpoints_db import CheckpointDatabase
 from ..models import Thread, ThreadMessage
 from ..core.logging import get_logger
 
@@ -152,10 +153,14 @@ async def thread_message_history_controller(
 
 
 async def delete_thread_controller(
-    user_id: str, thread_id: str, app_db: AppDatabase
+    user_id: str,
+    thread_id: str,
+    app_db: AppDatabase,
+    checkpoints_db: CheckpointDatabase,
 ) -> ThreadDeleteResult:
     try:
         await app_db.delete_thread(thread_id, user_id)
+        await checkpoints_db.delete_thread(thread_id)
 
         return ThreadDeleteResult(success=True)
 

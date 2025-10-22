@@ -9,7 +9,6 @@ from langgraph.graph.state import CompiledStateGraph, RunnableConfig
 from ..agent.state import AgentState, ContextSchema
 from ..core.llm_utils.title_generator import generate_chat_title
 from ..core.llm_utils.normalize import get_msg_content_text
-from ..core.db_ops.agent_checkpoints_db import thread_exists
 from ..core.db_ops.app_db import AppDatabase, DatabaseException, MessageType
 from ..core.logging import get_logger
 

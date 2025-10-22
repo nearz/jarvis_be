@@ -14,6 +14,7 @@ from .agent.tavily_client import get_async_tavily_client, MissingApiKey
 from .core.config import settings
 from .core.logging import setup_logging, get_logger
 from .core.db_ops.app_db import init_app_db, AppDatabase
+from .core.db_ops.agent_checkpoints_db import CheckpointDatabase
 from .middleware import LoggingMiddleware
 
 setup_logging(settings.LOG_LEVEL)
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI):
         checkpoints_conn = await aiosqlite.connect("checkpoints.db")
         app.state.saver = AsyncSqliteSaver(checkpoints_conn)
         app.state.graph = build_graph(app.state.saver)
+        app.state.checkpoints_db = CheckpointDatabase(checkpoints_conn)
 
         app_db_conn = await aiosqlite.connect("app.db")
         await init_app_db(app_db_conn)
