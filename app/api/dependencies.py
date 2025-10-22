@@ -32,15 +32,18 @@ async def get_current_user(
     Raises:
         HTTPException 401: If token invalid, expired, or user not found.
     """
+    logger.info("Authorizing user")
     token = creds.credentials
 
     try:
         payload = decode_token(token)
 
-    except HTTPException:
+    except HTTPException as e:
+        logger.error("Authorization error | error: %s", e.detail)
         raise
 
     except Exception as e:
+        logger.exception("Unexpected system error occured | error: %s", str(e))
         raise HTTPException(
             status_code=500,
             detail="Unexpected system error",
@@ -50,6 +53,7 @@ async def get_current_user(
     user_id = payload.get("sub")
 
     if not user_id:
+        logger.warning("Token missing user identifier")
         raise HTTPException(
             status_code=401,
             detail="Token missing user identifier",
@@ -59,6 +63,7 @@ async def get_current_user(
     try:
         user = await app_db.get_user_by_id(user_id)
     except DatabaseException as e:
+        logger.error("Database exception occured | error: %s", str(e))
         raise HTTPException(
             status_code=503,
             detail="Database temporarily unavailable",
@@ -66,12 +71,14 @@ async def get_current_user(
         )
 
     if not user:
+        logger.warning("Could not fetch user")
         raise HTTPException(
             status_code=401,
             detail="Authentication Error",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    logger.info("User authorized | user_id: %s", user["id"])
     return User(id=user["id"], email=user["email"])
 
 
@@ -91,6 +98,7 @@ async def thread_validation(
         lg_thread_exists = True if lg_thread else False
 
     except DatabaseException as e:
+        logger.error("Database exception occured | error: %s", str(e))
         raise HTTPException(
             status_code=503,
             detail="Database temporarily unavailable",
@@ -108,9 +116,19 @@ async def thread_validation(
         )
 
     if not thread_owned:
+        logger.warning(
+            "Thread does not exist or not owned by user | thread_id: %s | user_id: %s",
+            thread_id,
+            user.id,
+        )
         raise HTTPException(status_code=403, detail="User cannot access thread")
 
     if not lg_thread_exists:
+        logger.warning(
+            "Thread does not exist in LangGraph checkpoints | thread_id: %s | user_id: %s",
+            thread_id,
+            user.id,
+        )
         raise HTTPException(
             status_code=404, detail="LangGraph checkpoint does not exist"
         )
