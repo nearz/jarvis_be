@@ -54,7 +54,7 @@ class AppDatabase:
                 )
             return True
         except aiosqlite.IntegrityError:
-            logger.debug(
+            logger.warning(
                 "User creation failed - integrity constraint | email: %s", email
             )
             return False
@@ -171,7 +171,7 @@ class AppDatabase:
                 )
             return True
         except aiosqlite.IntegrityError:
-            logger.debug(
+            logger.warning(
                 "Set last login failed - integrity constraint | user_id: %s", user_id
             )
             return False
@@ -196,18 +196,18 @@ class AppDatabase:
             return False
 
     async def create_user_thread(
-        self, user_id: str, thread_id: str, title: str
+        self, user_id: str, thread_id: str, title: str, last_llm_used: str
     ) -> bool:
         try:
             async with self.transaction():
                 await self.conn.execute(
-                    """INSERT INTO user_threads (user_id, thread_id, title)
-                    VALUES(?, ?, ?)""",
-                    (user_id, thread_id, title),
+                    """INSERT INTO user_threads (user_id, thread_id, title, last_llm_used)
+                    VALUES(?, ?, ?, ?)""",
+                    (user_id, thread_id, title, last_llm_used),
                 )
             return True
         except aiosqlite.IntegrityError:
-            logger.debug(
+            logger.warning(
                 "Create user thread failed - integrity constraint | user_id: %s | thread_id: %s",
                 user_id,
                 thread_id,
@@ -267,17 +267,19 @@ class AppDatabase:
             raise DatabaseException(f"Unexpected database error: {e}") from e
 
     # No DatabaseExceptions: Leave as return False for any exceptions so does not block login.
-    async def set_thread_updated_at(self, user_id: str, thread_id: str) -> bool:
+    async def set_thread_updated(
+        self, user_id: str, thread_id: str, last_llm_used: str
+    ) -> bool:
         try:
             async with self.transaction():
                 await self.conn.execute(
-                    """UPDATE user_threads SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                    """UPDATE user_threads SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), last_llm_used = ?
                     WHERE user_id = ? AND thread_id = ?""",
-                    (user_id, thread_id),
+                    (last_llm_used, user_id, thread_id),
                 )
             return True
         except aiosqlite.IntegrityError:
-            logger.debug(
+            logger.warning(
                 "Set thread updated_at failed - integrity constraint | user_id: %s | thread_id: %s",
                 user_id,
                 thread_id,
@@ -341,25 +343,33 @@ class AppDatabase:
             raise DatabaseException(f"Unexpected database error: {e}") from e
 
     async def create_thread_msg(
-        self, content: str, msg_type: str, msg_idx: int, msg_id: str, thread_id: str
+        self, content: str, msg_type: str, llm: str, msg_id: str, thread_id: str
     ) -> bool:
         try:
             async with self.transaction():
+                await self.conn.execute("BEGIN IMMEDIATE")
+                cursor = await self.conn.execute(
+                    "SELECT MAX(message_index) FROM thread_messages WHERE thread_id = ?",
+                    (thread_id,),
+                )
+                res = await cursor.fetchone()
+                last_idx = res[0] if res and res[0] is not None else 0
                 await self.conn.execute(
                     """INSERT INTO thread_messages 
-                    (content, message_type, message_index, message_id, thread_id)
-                    VALUES(?, ?, ?, ?, ?)""",
+                    (content, message_type, llm, message_index, message_id, thread_id)
+                    VALUES(?, ?, ?, ?, ?, ?)""",
                     (
                         content,
                         msg_type,
-                        msg_idx,
+                        llm,
+                        last_idx + 1,
                         msg_id,
                         thread_id,
                     ),
                 )
             return True
         except aiosqlite.IntegrityError as e:
-            logger.debug(
+            logger.warning(
                 "Create thread message failed - integrity constraint | thread_id: %s | message_id: %s | error: %s",
                 thread_id,
                 msg_id,
@@ -452,6 +462,34 @@ class AppDatabase:
             )
             raise DatabaseException(f"Unexpected database error: {e}") from e
 
+    async def delete_thread(self, thread_id: str, user_id: str):
+        try:
+            async with self.transaction():
+                await self.conn.execute(
+                    "DELETE FROM user_threads WHERE thread_id = ? AND user_id = ?",
+                    (thread_id, user_id),
+                )
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Delete thread failed - operational error | thread_id: %s | error: %s",
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Delete thread failed - database error | thread_id: %s | error: %s",
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Delete thread failed - unexpected error | thread_id: %s",
+                thread_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
 
 async def init_app_db(conn: aiosqlite.Connection):
     await conn.execute("PRAGMA foreign_keys = ON")
@@ -475,6 +513,7 @@ async def init_app_db(conn: aiosqlite.Connection):
         user_id TEXT NOT NULL,
         thread_id TEXT UNIQUE NOT NULL,
         title TEXT DEFAULT 'New Chat',
+        last_llm_used TEXT,
         updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), 
         FOREIGN KEY (user_id) REFERENCES users(id) on DELETE CASCADE
@@ -489,6 +528,7 @@ async def init_app_db(conn: aiosqlite.Connection):
         message_index INTEGER NOT NULL,
         thread_id TEXT NOT NULL,
         message_id TEXT NOT NULL,
+        llm TEXT,
         message_type TEXT NOT NULL CHECK(message_type IN ('user', 'ai')),
         content TEXT,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),

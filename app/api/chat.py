@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from .dependencies import get_app_graph, get_graph_saver, get_current_user, get_app_db
+from .dependencies import (
+    get_app_graph,
+    get_graph_saver,
+    get_current_user,
+    get_app_db,
+    thread_validation,
+)
 from ..models.request_models import ChatRequest
 from ..models import User
 from ..controllers.chat import chat_controller, ChatErrorType, ChatResult
@@ -49,8 +55,8 @@ async def chat(
 
 @router.post("/chat/{thread_id}")
 async def chat_thread(
-    thread_id: str,
     req: ChatRequest,
+    thread_id: str = Depends(thread_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
     graph=Depends(get_app_graph),
@@ -58,18 +64,6 @@ async def chat_thread(
 ):
     thread_id = thread_id.strip()
     logger.info("Chat thread request | thread_id: %s", thread_id)
-
-    if not await thread_exists(saver, thread_id):
-        logger.warning("Thread id not found | thread_id: %s", thread_id)
-        return JSONResponse(
-            status_code=400,
-            content={
-                "success": False,
-                "error_type": ChatErrorType.VALIDATION_ERROR.value,
-                "error_details": "Chat thread_id does not exist",
-                "thread_id": thread_id,
-            },
-        )
 
     result = await chat_controller(
         req.message, req.llm, user.id, app_db, graph, thread_id=thread_id

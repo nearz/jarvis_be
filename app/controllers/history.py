@@ -47,6 +47,18 @@ class ThreadMessagesResult:
         self.error_details = error_details
 
 
+class ThreadDeleteResult:
+    def __init__(
+        self,
+        success: bool,
+        error_type: Optional[HistoryErrorType] = None,
+        error_details: Optional[str] = None,
+    ):
+        self.success = success
+        self.error_type = error_type
+        self.error_details = error_details
+
+
 async def history_controller(user_id: str, app_db: AppDatabase) -> HistoryResult:
     try:
         threads_db = await app_db.get_user_threads(user_id)
@@ -59,6 +71,7 @@ async def history_controller(user_id: str, app_db: AppDatabase) -> HistoryResult
             Thread(
                 title=t["title"],
                 thread_id=t["thread_id"],
+                last_llm_used=t["last_llm_used"],
                 created_at=t["created_at"],
                 updated_at=t["updated_at"],
             )
@@ -93,36 +106,24 @@ async def thread_message_history_controller(
     user_id: str, thread_id: str, app_db: AppDatabase
 ) -> ThreadMessagesResult:
     try:
-        vto_res = await app_db.verify_thread_ownership(user_id, thread_id)
-        if not vto_res:
-            logger.warning(
-                "User does not own thread | thread_id: %s | user_id: %s",
-                thread_id,
-                user_id,
-            )
-            return ThreadMessagesResult(
-                success=False,
-                error_type=HistoryErrorType.FORBIDDEN_ERROR,
-                error_details="User does not own this thread",
-            )
-
         msgs_db = await app_db.get_thread_messages(thread_id)
         if msgs_db is None:
-            logger.warning(
-                "No messages for this thread | thread_id: %s | user_id: %s",
+            logger.critical(
+                "Data Inconsistency: Thread exists but has no messages | thread_id: %s | user_id: %s",
                 thread_id,
                 user_id,
             )
             return ThreadMessagesResult(
                 success=False,
-                error_type=HistoryErrorType.VALIDATION_ERROR,
-                error_details="No messages for this thread",
+                error_type=HistoryErrorType.DATABASE_ERROR,
+                error_details="Data inconsistency detected: thread exists but message history is missing",
             )
 
         msgs = [
             ThreadMessage(
                 index=m["message_index"],
                 content=m["content"],
+                llm=m["llm"],
                 message_type=m["message_type"],
                 message_id=m["message_id"],
                 thread_id=m["thread_id"],
@@ -144,6 +145,35 @@ async def thread_message_history_controller(
     except Exception as e:
         logger.exception("System error | user_id: %s", user_id)
         return ThreadMessagesResult(
+            success=False,
+            error_type=HistoryErrorType.SYSTEM_ERROR,
+            error_details="unexpected system failure",
+        )
+
+
+async def delete_thread_controller(
+    user_id: str, thread_id: str, app_db: AppDatabase
+) -> ThreadDeleteResult:
+    try:
+        await app_db.delete_thread(thread_id, user_id)
+
+        return ThreadDeleteResult(success=True)
+
+    except DatabaseException as e:
+        logger.exception(
+            "Database exception occured | thread_id: %s | user_id: %s",
+            thread_id,
+            user_id,
+        )
+        return ThreadDeleteResult(
+            success=False,
+            error_type=HistoryErrorType.DATABASE_ERROR,
+            error_details="Database exception occured",
+        )
+
+    except Exception as e:
+        logger.exception("Exception occured while deleting a threadlk ")
+        return ThreadDeleteResult(
             success=False,
             error_type=HistoryErrorType.SYSTEM_ERROR,
             error_details="unexpected system failure",

@@ -1,11 +1,14 @@
 from fastapi import Request, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from langgraph.graph.state import RunnableConfig
 
 from ..core.db_ops.app_db import AppDatabase, DatabaseException
 from ..core.auth.token import decode_token
+from ..core.logging import get_logger
 from ..models import User
 
 security = HTTPBearer()
+logger = get_logger(__name__)
 
 
 def get_app_graph(req: Request):
@@ -40,7 +43,7 @@ async def get_current_user(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="Unexpected error during authentication",
+            detail="Unexpected system error",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -70,3 +73,47 @@ async def get_current_user(
         )
 
     return User(id=user["id"], email=user["email"])
+
+
+async def thread_validation(
+    thread_id: str,
+    app_db: AppDatabase = Depends(get_app_db),
+    saver=Depends(get_graph_saver),
+    user=Depends(get_current_user),
+) -> str:
+    thread_id = thread_id.strip()
+    logger.info("Validating thread | thread_id: %s | user_id: %s", thread_id, user.id)
+    try:
+        thread_owned = await app_db.verify_thread_ownership(user.id, thread_id)
+
+        config = RunnableConfig({"configurable": {"thread_id": thread_id}})
+        lg_thread = await saver.aget(config)
+        lg_thread_exists = True if lg_thread else False
+
+    except DatabaseException as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Database temporarily unavailable",
+        )
+
+    except Exception as e:
+        logger.exception(
+            "Exception occured while validating thread | thread_id: %s | error: %s",
+            thread_id,
+            str(e),
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unexpected system error",
+        )
+
+    if not thread_owned:
+        raise HTTPException(status_code=403, detail="User cannot access thread")
+
+    if not lg_thread_exists:
+        raise HTTPException(
+            status_code=404, detail="LangGraph checkpoint does not exist"
+        )
+
+    logger.info("Thread validated | thread_id: %s | user_id: %s", thread_id, user.id)
+    return thread_id

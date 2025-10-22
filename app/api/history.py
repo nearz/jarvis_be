@@ -2,13 +2,20 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from typing import Union
 
-from .dependencies import get_current_user, get_app_db, get_graph_saver
+from .dependencies import (
+    get_current_user,
+    get_app_db,
+    get_graph_saver,
+    thread_validation,
+)
 from ..controllers.history import (
     history_controller,
     thread_message_history_controller,
+    delete_thread_controller,
     HistoryErrorType,
     HistoryResult,
     ThreadMessagesResult,
+    ThreadDeleteResult,
 )
 from ..models import User, Thread
 from ..models.response_models import HistoryResponse, ThreadHistoryResponse
@@ -41,32 +48,11 @@ async def thread_history(
 
 @router.get("/history/{thread_id}")
 async def thread_message_history(
-    thread_id: str,
+    thread_id: str = Depends(thread_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
     saver=Depends(get_graph_saver),
 ):
-    thread_id = thread_id.strip()
-    logger.info(
-        "Thread message history request | thread_id: %s | user_id: %s",
-        thread_id,
-        user.id,
-    )
-
-    if not await thread_exists(saver, thread_id):
-        logger.warning(
-            "Thread does not exists | thread_id: %s | user_id: %s", thread_id, user.id
-        )
-        return JSONResponse(
-            status_code=400,
-            content={
-                "success": False,
-                "error_type": HistoryErrorType.VALIDATION_ERROR.value,
-                "error_details": "Chat thread_id does not exist",
-                "thread_id": thread_id,
-            },
-        )
-
     result = await thread_message_history_controller(user.id, thread_id, app_db)
 
     if result.success:
@@ -86,9 +72,40 @@ async def thread_message_history(
         return _create_error_response(result)
 
 
+@router.delete("/history/{thread_id}")
+async def delete_thread(
+    thread_id: str = Depends(thread_validation),
+    user: User = Depends(get_current_user),
+    app_db: AppDatabase = Depends(get_app_db),
+    saver=Depends(get_graph_saver),
+):
+    result = await delete_thread_controller(user.id, thread_id, app_db)
+
+    if result.success:
+        logger.info(
+            "Thread deleted succesfully | thread_id: %s | user_id: %s",
+            thread_id,
+            user.id,
+        )
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "thread_id": thread_id,
+            },
+        )
+    else:
+        logger.error(
+            "Failed to delete thread | thread_id: %s | user_id: %s",
+            thread_id,
+            user.id,
+        )
+        return _create_error_response(result)
+
+
 # TODO: Should I create a Base History Result?
 def _create_error_response(
-    result: Union[HistoryResult, ThreadMessagesResult],
+    result: Union[HistoryResult, ThreadMessagesResult, ThreadDeleteResult],
 ) -> JSONResponse:
     """
     Maps ChatResult error types to HTTP status codes and returns formatted error response.

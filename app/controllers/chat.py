@@ -43,6 +43,9 @@ class ChatResult:
 
 
 # TODO: Is there a better way to setup ainvoke params package? Maybe a func in state.
+# TODO: Consider DB operation order. LangGraph could save checkpoint, but saving to
+# app db could fail then would be out of sync. Can you roll back LangGraph, or retry
+# on app db?
 async def chat_controller(
     message: str,
     llm: str,
@@ -52,43 +55,41 @@ async def chat_controller(
     *,
     thread_id: Union[str, None],
 ) -> ChatResult:
-    # New Chat does not provide a thread id, set one for new thread
     new_thread = False
     if not thread_id:
         thread_id = str(uuid4())
         new_thread = True
         logger.info("New thread created | thread_id: %s", thread_id)
-    else:
-        try:
-            vto_res = await app_db.verify_thread_ownership(user_id, thread_id)
-        except DatabaseException as e:
-            logger.exception(
-                "Database exception occured | user_id: %s | thread_id: %s",
-                user_id,
-                thread_id,
-            )
-            return ChatResult(
-                success=False,
-                thread_id=thread_id,
-                error_type=ChatErrorType.DATABASE_ERROR,
-                error_details="Database exception occured",
-            )
+    # else:
+    #     try:
+    #         vto_res = await app_db.verify_thread_ownership(user_id, thread_id)
+    #     except DatabaseException as e:
+    #         logger.exception(
+    #             "Database exception occured | user_id: %s | thread_id: %s",
+    #             user_id,
+    #             thread_id,
+    #         )
+    #         return ChatResult(
+    #             success=False,
+    #             thread_id=thread_id,
+    #             error_type=ChatErrorType.DATABASE_ERROR,
+    #             error_details="Database exception occured",
+    #         )
+    #
+    #     if not vto_res:
+    #         logger.warning(
+    #             "User does not own this thread | user_id: %s | thread_id: %s",
+    #             user_id,
+    #             thread_id,
+    #         )
+    #         return ChatResult(
+    #             success=False,
+    #             thread_id=thread_id,
+    #             error_type=ChatErrorType.FORBIDDEN_ERROR,
+    #             error_details="User does not own this thread",
+    #         )
+    #     logger.info("Existing thread | thread_id: %s", thread_id)
 
-        if not vto_res:
-            logger.warning(
-                "User does not own this thread | user_id: %s | thread_id: %s",
-                user_id,
-                thread_id,
-            )
-            return ChatResult(
-                success=False,
-                thread_id=thread_id,
-                error_type=ChatErrorType.FORBIDDEN_ERROR,
-                error_details="User does not own this thread",
-            )
-        logger.info("Existing thread | thread_id: %s", thread_id)
-
-    # Graph execution
     try:
         msg = HumanMessage(message)
         logger.debug(
@@ -115,23 +116,19 @@ async def chat_controller(
         )
 
     except Exception as e:
-        # This catches LLM API errors, tool errors, graph execution errors
-        error_msg = str(e)
-
         logger.exception(
-            "Graph execution failed | thread_id: %s | error message: %s",
+            "Graph execution failed | thread_id: %s | error: %s",
             thread_id,
-            error_msg,
+            str(e),
         )
 
         return ChatResult(
             success=False,
             thread_id=thread_id,
             error_type=ChatErrorType.GRAPH_EXECUTION_ERROR,
-            error_details=error_msg,
+            error_details="Graph execution failure",
         )
 
-    # Process AI Response
     try:
         if not result or "messages" not in result:
             logger.error("Invalid response structure | thread_id: %s", thread_id)
@@ -171,7 +168,7 @@ async def chat_controller(
         # TODO: How to handle insert false
         if new_thread:
             title = await generate_chat_title(message, last_message.content)
-            res = await app_db.create_user_thread(user_id, thread_id, title)
+            res = await app_db.create_user_thread(user_id, thread_id, title, llm)
             if not res:
                 logger.error(
                     "Failed to create user thread | user_id: %s | thread_id: %s",
@@ -185,15 +182,27 @@ async def chat_controller(
                     error_details="Failed to save conversation thread",
                 )
 
-        tua_res = await app_db.set_thread_updated_at(user_id, thread_id)
+        save_msgs_res = await _save_msgs_to_db(messages, llm, thread_id, app_db)
+        if not save_msgs_res:
+            logger.error(
+                "Failed to save thread messages | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
+            return ChatResult(
+                success=False,
+                thread_id=thread_id,
+                error_type=ChatErrorType.DATABASE_ERROR,
+                error_details="Failed to save thread messages",
+            )
+
+        tua_res = await app_db.set_thread_updated(user_id, thread_id, llm)
         if not tua_res:
             logger.warning(
                 "Thread updated at failure | user_id: %s | thread_id: %s",
                 user_id,
                 thread_id,
             )
-
-        await _save_msgs_to_db(messages, thread_id, app_db)
 
         return ChatResult(
             success=True, message=last_message.content, thread_id=thread_id
@@ -229,10 +238,12 @@ async def chat_controller(
         )
 
 
-# TODO: How to handle types for .content and .id?
+# NOTE: Was a concern when getting latest index and inserting new message was not atomic.
+# Moved everthing into 1 transaction in create_thread_msg. But this may still
+# need improvement considerations, possibly when moving to Postgres.
 async def _save_msgs_to_db(
-    messages: list[BaseMessage], thread_id: str, app_db: AppDatabase
-) -> None:
+    messages: list[BaseMessage], llm: str, thread_id: str, app_db: AppDatabase
+) -> bool:
     human_msg = _get_last_human_message(messages)
     ai_msg = _get_last_ai_message(messages)
 
@@ -242,23 +253,26 @@ async def _save_msgs_to_db(
     if not ai_msg or not isinstance(ai_msg.id, str):
         raise ValueError("Invalid AI message or missing message ID")
 
-    last_index = await app_db.get_thread_msg_last_idx(thread_id)
-
-    await app_db.create_thread_msg(
+    msg_one_res = await app_db.create_thread_msg(
         get_msg_content_text(human_msg.content),
         MessageType.USER.value,
-        last_index + 1,
+        llm,
         human_msg.id,
         thread_id,
     )
 
-    await app_db.create_thread_msg(
+    msg_two_res = await app_db.create_thread_msg(
         get_msg_content_text(ai_msg.content),
         MessageType.AI.value,
-        last_index + 2,
+        llm,
         ai_msg.id,
         thread_id,
     )
+
+    if not (msg_one_res and msg_two_res):
+        return False
+
+    return True
 
 
 def _get_last_human_message(messages: list[BaseMessage]) -> Union[HumanMessage, None]:
