@@ -347,25 +347,15 @@ class AppDatabase:
     ) -> bool:
         try:
             async with self.transaction():
-                await self.conn.execute("BEGIN IMMEDIATE")
-                cursor = await self.conn.execute(
-                    "SELECT MAX(message_index) FROM thread_messages WHERE thread_id = ?",
-                    (thread_id,),
-                )
-                res = await cursor.fetchone()
-                last_idx = res[0] if res and res[0] is not None else 0
                 await self.conn.execute(
                     """INSERT INTO thread_messages 
-                    (content, message_type, llm, message_index, message_id, thread_id)
-                    VALUES(?, ?, ?, ?, ?, ?)""",
-                    (
-                        content,
-                        msg_type,
-                        llm,
-                        last_idx + 1,
-                        msg_id,
-                        thread_id,
-                    ),
+                   (content, message_type, llm, message_index, message_id, thread_id)
+                    SELECT ?, ?, ?, 
+                       COALESCE(MAX(message_index), 0) + 1,
+                       ?, ?
+                    FROM thread_messages 
+                    WHERE thread_id = ?""",
+                    (content, msg_type, llm, msg_id, thread_id, thread_id),
                 )
             return True
         except aiosqlite.IntegrityError as e:
