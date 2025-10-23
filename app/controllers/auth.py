@@ -1,7 +1,6 @@
 import uuid
 from typing import Optional, Union
 from enum import Enum
-from pydantic import BaseModel
 
 from ..models import Token
 from ..core.logging import get_logger
@@ -10,6 +9,8 @@ from ..core.auth.password import hash_password, verify_password
 from ..core.auth.token import encode_token
 
 logger = get_logger(__name__)
+
+DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$Kxe9asgS7lH9J5nM/cofkA$4DmKyLnrHIAMmdIv1uLsFq2wIKojh6kP8r/IkVQ6byw"
 
 
 class AuthErrorType(Enum):
@@ -66,11 +67,11 @@ async def register_controller(
         return AuthResult(success=True)
 
     except DatabaseException as e:
-        logger.exception("Database exception occured | error: %s", str(e))
+        logger.exception("Database exception occurred")
         return AuthResult(
             success=False,
             error_type=AuthErrorType.DATABASE_ERROR,
-            error_details="Database exception occured",
+            error_details="Database exception occurred",
         )
 
     except Exception as e:
@@ -92,7 +93,7 @@ async def login_controller(
         if user:
             stored_hash = user["password"]
         else:
-            stored_hash = "$argon2id$v=19$m=65536,t=3,p=4$Kxe9asgS7lH9J5nM/cofkA$4DmKyLnrHIAMmdIv1uLsFq2wIKojh6kP8r/IkVQ6byw"
+            stored_hash = DUMMY_HASH
 
         valid_pwd = verify_password(password, stored_hash)
 
@@ -114,19 +115,19 @@ async def login_controller(
         return AuthResult(success=True, token=Token(token=token, token_type="bearer"))
 
     except DatabaseException as e:
-        logger.exception("Database exception occured | error: %s", str(e))
+        logger.exception("Database exception occurred")
         verify_password(
             password,
-            "$argon2id$v=19$m=65536,t=3,p=4$Kxe9asgS7lH9J5nM/cofkA$4DmKyLnrHIAMmdIv1uLsFq2wIKojh6kP8r/IkVQ6byw",
+            DUMMY_HASH,
         )
         return AuthResult(
             success=False,
             error_type=AuthErrorType.DATABASE_ERROR,
-            error_details="Database exception occured",
+            error_details="Database exception occurred",
         )
 
     except Exception as e:
-        logger.exception("System error: %s", str(e))
+        logger.exception("System error")
         return AuthResult(
             success=False,
             error_type=AuthErrorType.SYSTEM_ERROR,

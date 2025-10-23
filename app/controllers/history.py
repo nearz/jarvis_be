@@ -87,11 +87,11 @@ async def history_controller(user_id: str, app_db: AppDatabase) -> HistoryResult
         return HistoryResult(success=True, threads=threads)
 
     except DatabaseException as e:
-        logger.exception("Database exception occured | user_id: %s", user_id)
+        logger.exception("Database exception occurred | user_id: %s", user_id)
         return HistoryResult(
             success=False,
             error_type=HistoryErrorType.DATABASE_ERROR,
-            error_details="Database exception occured",
+            error_details="Database exception occurred",
         )
 
     except Exception as e:
@@ -136,11 +136,11 @@ async def thread_message_history_controller(
         return ThreadMessagesResult(success=True, messages=msgs)
 
     except DatabaseException as e:
-        logger.exception("Database exception occured | user_id: %s", user_id)
+        logger.exception("Database exception occurred | user_id: %s", user_id)
         return ThreadMessagesResult(
             success=False,
             error_type=HistoryErrorType.DATABASE_ERROR,
-            error_details="Database exception occured",
+            error_details="Database exception occurred",
         )
 
     except Exception as e:
@@ -166,18 +166,18 @@ async def delete_thread_controller(
 
     except DatabaseException as e:
         logger.exception(
-            "Database exception occured | thread_id: %s | user_id: %s",
+            "Database exception occurred | thread_id: %s | user_id: %s",
             thread_id,
             user_id,
         )
         return ThreadDeleteResult(
             success=False,
             error_type=HistoryErrorType.DATABASE_ERROR,
-            error_details="Database exception occured",
+            error_details="Database exception occurred",
         )
 
     except Exception as e:
-        logger.exception("Exception occured while deleting a threadlk ")
+        logger.exception("Exception occurred while deleting a thread")
         return ThreadDeleteResult(
             success=False,
             error_type=HistoryErrorType.SYSTEM_ERROR,

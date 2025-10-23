@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import Request, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from langgraph.graph.state import RunnableConfig
@@ -47,7 +48,7 @@ async def get_current_user(
         raise
 
     except Exception as e:
-        logger.exception("Unexpected system error occured | error: %s", str(e))
+        logger.exception("Unexpected system error occurred")
         raise HTTPException(
             status_code=500,
             detail="Unexpected system error",
@@ -67,7 +68,7 @@ async def get_current_user(
     try:
         user = await app_db.get_user_by_id(user_id)
     except DatabaseException as e:
-        logger.error("Database exception occured | error: %s", str(e))
+        logger.error("Database exception occurred | error: %s", str(e))
         raise HTTPException(
             status_code=503,
             detail="Database temporarily unavailable",
@@ -95,14 +96,21 @@ async def thread_validation(
     thread_id = thread_id.strip()
     logger.info("Validating thread | thread_id: %s | user_id: %s", thread_id, user.id)
     try:
+        UUID(thread_id)
         thread_owned = await app_db.verify_thread_ownership(user.id, thread_id)
 
         config = RunnableConfig({"configurable": {"thread_id": thread_id}})
         lg_thread = await saver.aget(config)
         lg_thread_exists = True if lg_thread else False
 
+    except ValueError:
+        logger.warning(
+            "Invalid thread_id format | thread_id: %s | user_id: %s", thread_id, user.id
+        )
+        raise HTTPException(status_code=400, detail="Invalid thread_id format")
+
     except DatabaseException as e:
-        logger.error("Database exception occured | error: %s", str(e))
+        logger.error("Database exception occurred | error: %s", str(e))
         raise HTTPException(
             status_code=503,
             detail="Database temporarily unavailable",
@@ -110,7 +118,7 @@ async def thread_validation(
 
     except Exception as e:
         logger.exception(
-            "Exception occured while validating thread | thread_id: %s | error: %s",
+            "Exception occurred while validating thread | thread_id: %s | error: %s",
             thread_id,
             str(e),
         )

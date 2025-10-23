@@ -59,35 +59,6 @@ async def chat_controller(
         thread_id = str(uuid4())
         new_thread = True
         logger.info("New thread created | thread_id: %s", thread_id)
-    # else:
-    #     try:
-    #         vto_res = await app_db.verify_thread_ownership(user_id, thread_id)
-    #     except DatabaseException as e:
-    #         logger.exception(
-    #             "Database exception occured | user_id: %s | thread_id: %s",
-    #             user_id,
-    #             thread_id,
-    #         )
-    #         return ChatResult(
-    #             success=False,
-    #             thread_id=thread_id,
-    #             error_type=ChatErrorType.DATABASE_ERROR,
-    #             error_details="Database exception occured",
-    #         )
-    #
-    #     if not vto_res:
-    #         logger.warning(
-    #             "User does not own this thread | user_id: %s | thread_id: %s",
-    #             user_id,
-    #             thread_id,
-    #         )
-    #         return ChatResult(
-    #             success=False,
-    #             thread_id=thread_id,
-    #             error_type=ChatErrorType.FORBIDDEN_ERROR,
-    #             error_details="User does not own this thread",
-    #         )
-    #     logger.info("Existing thread | thread_id: %s", thread_id)
 
     try:
         msg = HumanMessage(message)
@@ -208,16 +179,16 @@ async def chat_controller(
         )
 
     except DatabaseException as e:
-        logger.exception("Database exception occured | thread_id: %s", thread_id)
+        logger.exception("Database exception occurred | thread_id: %s", thread_id)
         return ChatResult(
             success=False,
             thread_id=thread_id,
             error_type=ChatErrorType.DATABASE_ERROR,
-            error_details="Database exception occured",
+            error_details="Database exception occurred",
         )
 
     except ValueError as e:
-        logger.exception("Value error occured | error: %s", str(e))
+        logger.exception("Value error occurred")
         return ChatResult(
             success=False,
             thread_id=thread_id,

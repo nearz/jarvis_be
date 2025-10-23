@@ -65,7 +65,7 @@ async def tavily_search(query: str) -> str:
         return "\n".join(lines)
 
     except Exception as e:
-        logger.exception("Tavily search failed | query %s | error: %s", query, str(e))
+        logger.exception("Tavily search failed | query: %s", query)
         return f"Error performing Tavily search: {e}"
 
 

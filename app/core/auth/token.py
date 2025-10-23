@@ -9,7 +9,7 @@ from ..config import settings
 
 class TokenPayload(TypedDict):
     sub: str
-    exp: str
+    exp: int
 
 
 def encode_token(data: dict) -> str:

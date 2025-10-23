@@ -34,7 +34,7 @@ async def generate_chat_title(
         return title or settings.DEFAULT_CHAT_TITLE
 
     except Exception as e:
-        logger.exception("Exception occurred in title generation | error: %s", str(e))
+        logger.exception("Exception occurred in title generation")
         return settings.DEFAULT_CHAT_TITLE
 
 

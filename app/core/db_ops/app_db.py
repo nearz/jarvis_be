@@ -549,6 +549,9 @@ async def init_app_db(conn: aiosqlite.Connection):
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_id ON thread_messages(thread_id)"
     )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_thread_messages_index ON thread_messages(thread_id, message_index)"
+    )
 
     await conn.commit()
     logger.info("App database initialized")
