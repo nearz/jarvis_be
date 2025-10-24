@@ -10,17 +10,17 @@ from .dependencies import (
 )
 from ..models.request_models import ChatRequest
 from ..models import User
-from ..controllers.chat import chat_controller, ChatErrorType, ChatResult
+from ..controllers.chat import chat_controller
 from ..core.db_ops.app_db import AppDatabase
 from ..core.logging import get_logger
+from .errors import create_error_response
 
 
 logger = get_logger(__name__)
 router = APIRouter()
 
+
 # TODO: Stream chat response.
-
-
 @router.post("/chat")
 async def chat(
     req: ChatRequest,
@@ -28,28 +28,24 @@ async def chat(
     app_db: AppDatabase = Depends(get_app_db),
     graph=Depends(get_app_graph),
 ):
-    logger.info("New Chat | message len: %d | llm: %s", len(req.message), req.llm)
+    logger.info("New chat | message len: %d | llm: %s", len(req.message), req.llm)
     result = await chat_controller(
         req.message, req.llm, user.id, app_db, graph, thread_id=None
     )
 
-    if result.success:
-        logger.info("Chat successful | thread id: %s", result.thread_id)
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "ai_message": result.message,
-                "thread_id": result.thread_id,
-            },
-        )
-    else:
-        logger.warning(
-            "Chat failed | error_type: %s | error_details: %s",
-            result.error_type.value,
-            result.error_details,
-        )
-        return _create_error_response(result)
+    if not result.success:
+        logger.warning("New chat error | user_id: %s", user.id)
+        return create_error_response(result)
+
+    logger.info("New chat successful | thread id: %s", result.thread_id)
+    return JSONResponse(
+        status_code=200,
+        content={
+            "success": True,
+            "ai_message": result.message,
+            "thread_id": result.thread_id,
+        },
+    )
 
 
 @router.post("/chat/{thread_id}")
@@ -67,49 +63,16 @@ async def chat_thread(
         req.message, req.llm, user.id, app_db, graph, thread_id=thread_id
     )
 
-    if result.success:
-        logger.info("Chat thread request successful | thread_id: %s", thread_id)
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "ai_message": result.message,
-                "thread_id": result.thread_id,
-            },
-        )
-    else:
-        logger.warning(
-            "Chat thread request failed | error_type: %s | error_details: %s",
-            result.error_type.value,
-            result.error_details,
-        )
-        return _create_error_response(result)
+    if not result.success:
+        logger.warning("Chat thread request error | thread_id: %s", thread_id)
+        return create_error_response(result)
 
-
-def _create_error_response(result: ChatResult) -> JSONResponse:
-    """
-    Maps ChatResult error types to HTTP status codes and returns formatted error response.
-    """
-    # Map error types to status codes
-    status_code_map = {
-        ChatErrorType.VALIDATION_ERROR: 400,
-        ChatErrorType.FORBIDDEN_ERROR: 403,
-        ChatErrorType.DATABASE_ERROR: 503,
-        ChatErrorType.GRAPH_EXECUTION_ERROR: 502,
-        ChatErrorType.RESPONSE_PROCESSING_ERROR: 502,
-        ChatErrorType.SYSTEM_ERROR: 500,
-    }
-
-    status_code = 400
-    if result.error_type is not None:
-        status_code = status_code_map.get(result.error_type, 400)
-
+    logger.info("Chat thread request successful | thread_id: %s", thread_id)
     return JSONResponse(
-        status_code=status_code,
+        status_code=200,
         content={
-            "success": False,
-            "error_type": result.error_type.value if result.error_type else None,
-            "error_details": result.error_details,
+            "success": True,
+            "ai_message": result.message,
             "thread_id": result.thread_id,
         },
     )

@@ -1,36 +1,15 @@
 import uuid
-from typing import Optional, Union
-from enum import Enum
 
 from ..models import Token
 from ..core.logging import get_logger
 from ..core.db_ops.app_db import AppDatabase, DatabaseException
 from ..core.auth.password import hash_password, verify_password
 from ..core.auth.token import encode_token
+from ..models.controller_models import AuthResult, ErrorType
 
 logger = get_logger(__name__)
 
 DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$Kxe9asgS7lH9J5nM/cofkA$4DmKyLnrHIAMmdIv1uLsFq2wIKojh6kP8r/IkVQ6byw"
-
-
-class AuthErrorType(Enum):
-    AUTHORIZATION_ERROR = "authorization_error"
-    DATABASE_ERROR = "database_error"
-    SYSTEM_ERROR = "system_error"
-
-
-class AuthResult:
-    def __init__(
-        self,
-        success: bool,
-        token: Optional[Token] = None,
-        error_type: Optional[AuthErrorType] = None,
-        error_details: Optional[str] = None,
-    ):
-        self.success = success
-        self.token = token
-        self.error_type = error_type
-        self.error_details = error_details
 
 
 # NOTE:
@@ -46,7 +25,7 @@ async def register_controller(
             logger.warning("Registration failure")
             return AuthResult(
                 success=False,
-                error_type=AuthErrorType.AUTHORIZATION_ERROR,
+                error_type=ErrorType.AUTHORIZATION_ERROR,
                 error_details="Cannot register user",
             )
 
@@ -59,7 +38,7 @@ async def register_controller(
             logger.warning("Registration failure")
             return AuthResult(
                 success=False,
-                error_type=AuthErrorType.AUTHORIZATION_ERROR,
+                error_type=ErrorType.AUTHORIZATION_ERROR,
                 error_details="Cannot register user",
             )
 
@@ -70,7 +49,7 @@ async def register_controller(
         logger.exception("Database exception occurred")
         return AuthResult(
             success=False,
-            error_type=AuthErrorType.DATABASE_ERROR,
+            error_type=ErrorType.DATABASE_ERROR,
             error_details="Database exception occurred",
         )
 
@@ -78,7 +57,7 @@ async def register_controller(
         logger.exception("System error")
         return AuthResult(
             success=False,
-            error_type=AuthErrorType.SYSTEM_ERROR,
+            error_type=ErrorType.SYSTEM_ERROR,
             error_details="Unexpected system failure",
         )
 
@@ -101,7 +80,7 @@ async def login_controller(
             logger.warning("Invalid credentials")
             return AuthResult(
                 success=False,
-                error_type=AuthErrorType.AUTHORIZATION_ERROR,
+                error_type=ErrorType.AUTHORIZATION_ERROR,
                 error_details="Invalid credentials",
             )
 
@@ -122,7 +101,7 @@ async def login_controller(
         )
         return AuthResult(
             success=False,
-            error_type=AuthErrorType.DATABASE_ERROR,
+            error_type=ErrorType.DATABASE_ERROR,
             error_details="Database exception occurred",
         )
 
@@ -130,6 +109,6 @@ async def login_controller(
         logger.exception("System error")
         return AuthResult(
             success=False,
-            error_type=AuthErrorType.SYSTEM_ERROR,
-            error_details="unexpected system failure",
+            error_type=ErrorType.SYSTEM_ERROR,
+            error_details="Unexpected system failure",
         )

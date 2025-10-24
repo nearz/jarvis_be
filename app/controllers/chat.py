@@ -1,7 +1,5 @@
 from uuid import uuid4
-from typing import Union, Optional
-from enum import Enum
-import logging
+from typing import Union
 
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 from langgraph.graph.state import CompiledStateGraph, RunnableConfig
@@ -11,34 +9,9 @@ from ..core.llm_utils.title_generator import generate_chat_title
 from ..core.llm_utils.normalize import get_msg_content_text
 from ..core.db_ops.app_db import AppDatabase, DatabaseException, MessageType
 from ..core.logging import get_logger
+from ..models.controller_models import ChatResult, ErrorType
 
 logger = get_logger(__name__)
-
-
-class ChatErrorType(Enum):
-    FORBIDDEN_ERROR = "forbidden_error"
-    VALIDATION_ERROR = "validation_error"
-    DATABASE_ERROR = "database_error"
-    LLM_ERROR = "llm_error"
-    GRAPH_EXECUTION_ERROR = "graph_execution_error"
-    RESPONSE_PROCESSING_ERROR = "response_processing_error"
-    SYSTEM_ERROR = "system_error"
-
-
-class ChatResult:
-    def __init__(
-        self,
-        success: bool,
-        message: Optional[str] = None,
-        thread_id: Optional[str] = None,
-        error_type: Optional[ChatErrorType] = None,
-        error_details: Optional[str] = None,
-    ):
-        self.success = success
-        self.message = message
-        self.thread_id = thread_id
-        self.error_type = error_type
-        self.error_details = error_details
 
 
 # TODO: Is there a better way to setup ainvoke params package? Maybe a func in state.
@@ -81,7 +54,7 @@ async def chat_controller(
         return ChatResult(
             success=False,
             thread_id=thread_id,
-            error_type=ChatErrorType.GRAPH_EXECUTION_ERROR,
+            error_type=ErrorType.GRAPH_EXECUTION_ERROR,
             error_details="Request timed out. Please try again.",
         )
 
@@ -95,7 +68,7 @@ async def chat_controller(
         return ChatResult(
             success=False,
             thread_id=thread_id,
-            error_type=ChatErrorType.GRAPH_EXECUTION_ERROR,
+            error_type=ErrorType.GRAPH_EXECUTION_ERROR,
             error_details="Graph execution failure",
         )
 
@@ -105,7 +78,7 @@ async def chat_controller(
             return ChatResult(
                 success=False,
                 thread_id=thread_id,
-                error_type=ChatErrorType.RESPONSE_PROCESSING_ERROR,
+                error_type=ErrorType.LLM_RESPONSE_PROCESSING_ERROR,
                 error_details="Invalid response from AI service",
             )
 
@@ -115,7 +88,7 @@ async def chat_controller(
             return ChatResult(
                 success=False,
                 thread_id=thread_id,
-                error_type=ChatErrorType.RESPONSE_PROCESSING_ERROR,
+                error_type=ErrorType.LLM_RESPONSE_PROCESSING_ERROR,
                 error_details="No response generated",
             )
 
@@ -125,7 +98,7 @@ async def chat_controller(
             return ChatResult(
                 success=False,
                 thread_id=thread_id,
-                error_type=ChatErrorType.RESPONSE_PROCESSING_ERROR,
+                error_type=ErrorType.LLM_RESPONSE_PROCESSING_ERROR,
                 error_details="Empty response generated",
             )
 
@@ -148,7 +121,7 @@ async def chat_controller(
                 return ChatResult(
                     success=False,
                     thread_id=thread_id,
-                    error_type=ChatErrorType.DATABASE_ERROR,
+                    error_type=ErrorType.DATABASE_ERROR,
                     error_details="Failed to save conversation thread",
                 )
 
@@ -162,7 +135,7 @@ async def chat_controller(
             return ChatResult(
                 success=False,
                 thread_id=thread_id,
-                error_type=ChatErrorType.DATABASE_ERROR,
+                error_type=ErrorType.DATABASE_ERROR,
                 error_details="Failed to save thread messages",
             )
 
@@ -183,7 +156,7 @@ async def chat_controller(
         return ChatResult(
             success=False,
             thread_id=thread_id,
-            error_type=ChatErrorType.DATABASE_ERROR,
+            error_type=ErrorType.DATABASE_ERROR,
             error_details="Database exception occurred",
         )
 
@@ -192,7 +165,7 @@ async def chat_controller(
         return ChatResult(
             success=False,
             thread_id=thread_id,
-            error_type=ChatErrorType.VALIDATION_ERROR,
+            error_type=ErrorType.VALIDATION_ERROR,
             error_details=str(e),
         )
 
@@ -203,14 +176,11 @@ async def chat_controller(
         return ChatResult(
             success=False,
             thread_id=thread_id,
-            error_type=ChatErrorType.RESPONSE_PROCESSING_ERROR,
+            error_type=ErrorType.SYSTEM_ERROR,
             error_details="Failed to process AI response",
         )
 
 
-# NOTE: Was a concern when getting latest index and inserting new message was not atomic.
-# Moved everthing into 1 transaction in create_thread_msg. But this may still
-# need improvement considerations, possibly when moving to Postgres.
 async def _save_msgs_to_db(
     messages: list[BaseMessage], llm: str, thread_id: str, app_db: AppDatabase
 ) -> bool:

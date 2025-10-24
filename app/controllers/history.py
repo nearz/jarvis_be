@@ -1,63 +1,16 @@
-from enum import Enum
-from typing import Optional
-from pydantic import BaseModel
-
-
 from ..core.db_ops.app_db import AppDatabase, DatabaseException
 from ..core.db_ops.agent_checkpoints_db import CheckpointDatabase
 from ..models import Thread, ThreadMessage
+from ..models.controller_models import (
+    HistoryResult,
+    ThreadMessagesResult,
+    ThreadDeleteResult,
+    ErrorType,
+)
 from ..core.logging import get_logger
 
 
 logger = get_logger(__name__)
-
-
-class HistoryErrorType(Enum):
-    FORBIDDEN_ERROR = "forbidden_error"
-    VALIDATION_ERROR = "validation_error"
-    AUTHORIZATION_ERROR = "authorization_error"
-    DATABASE_ERROR = "database_error"
-    SYSTEM_ERROR = "system_error"
-
-
-class HistoryResult:
-    def __init__(
-        self,
-        success: bool,
-        threads: Optional[list[Thread]] = None,
-        error_type: Optional[HistoryErrorType] = None,
-        error_details: Optional[str] = None,
-    ):
-        self.success = success
-        self.threads = threads
-        self.error_type = error_type
-        self.error_details = error_details
-
-
-class ThreadMessagesResult:
-    def __init__(
-        self,
-        success: bool,
-        messages: Optional[list[ThreadMessage]] = None,
-        error_type: Optional[HistoryErrorType] = None,
-        error_details: Optional[str] = None,
-    ):
-        self.success = success
-        self.messages = messages
-        self.error_type = error_type
-        self.error_details = error_details
-
-
-class ThreadDeleteResult:
-    def __init__(
-        self,
-        success: bool,
-        error_type: Optional[HistoryErrorType] = None,
-        error_details: Optional[str] = None,
-    ):
-        self.success = success
-        self.error_type = error_type
-        self.error_details = error_details
 
 
 async def history_controller(user_id: str, app_db: AppDatabase) -> HistoryResult:
@@ -90,7 +43,7 @@ async def history_controller(user_id: str, app_db: AppDatabase) -> HistoryResult
         logger.exception("Database exception occurred | user_id: %s", user_id)
         return HistoryResult(
             success=False,
-            error_type=HistoryErrorType.DATABASE_ERROR,
+            error_type=ErrorType.DATABASE_ERROR,
             error_details="Database exception occurred",
         )
 
@@ -98,8 +51,8 @@ async def history_controller(user_id: str, app_db: AppDatabase) -> HistoryResult
         logger.exception("System error")
         return HistoryResult(
             success=False,
-            error_type=HistoryErrorType.SYSTEM_ERROR,
-            error_details="unexpected system failure",
+            error_type=ErrorType.SYSTEM_ERROR,
+            error_details="Unexpected system failure",
         )
 
 
@@ -116,7 +69,7 @@ async def thread_message_history_controller(
             )
             return ThreadMessagesResult(
                 success=False,
-                error_type=HistoryErrorType.DATABASE_ERROR,
+                error_type=ErrorType.DATABASE_ERROR,
                 error_details="Data inconsistency detected: thread exists but message history is missing",
             )
 
@@ -139,7 +92,7 @@ async def thread_message_history_controller(
         logger.exception("Database exception occurred | user_id: %s", user_id)
         return ThreadMessagesResult(
             success=False,
-            error_type=HistoryErrorType.DATABASE_ERROR,
+            error_type=ErrorType.DATABASE_ERROR,
             error_details="Database exception occurred",
         )
 
@@ -147,8 +100,8 @@ async def thread_message_history_controller(
         logger.exception("System error | user_id: %s", user_id)
         return ThreadMessagesResult(
             success=False,
-            error_type=HistoryErrorType.SYSTEM_ERROR,
-            error_details="unexpected system failure",
+            error_type=ErrorType.SYSTEM_ERROR,
+            error_details="Unexpected system failure",
         )
 
 
@@ -172,7 +125,7 @@ async def delete_thread_controller(
         )
         return ThreadDeleteResult(
             success=False,
-            error_type=HistoryErrorType.DATABASE_ERROR,
+            error_type=ErrorType.DATABASE_ERROR,
             error_details="Database exception occurred",
         )
 
@@ -180,6 +133,6 @@ async def delete_thread_controller(
         logger.exception("Exception occurred while deleting a thread")
         return ThreadDeleteResult(
             success=False,
-            error_type=HistoryErrorType.SYSTEM_ERROR,
-            error_details="unexpected system failure",
+            error_type=ErrorType.SYSTEM_ERROR,
+            error_details="Unexpected system failure",
         )

@@ -3,13 +3,13 @@ from pydantic import BaseModel, EmailStr
 
 class RegisterResponse(BaseModel):
     success: bool = True
-    message: str
 
     class Config:
         json_schema = {"example": {"success": True, "message": "User registered"}}
 
 
 class TokenResponse(BaseModel):
+    success: bool = True
     token: str
     token_type: str = "bearer"
 
@@ -23,6 +23,7 @@ class TokenResponse(BaseModel):
 
 
 class UserResponse(BaseModel):
+    success: bool = True
     id: str
     email: EmailStr
 
