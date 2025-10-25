@@ -47,3 +47,21 @@ class ThreadMessagesResult(BaseResult):
 @dataclass
 class ThreadDeleteResult(BaseResult):
     pass
+
+
+@dataclass
+class ContentStreamChunk:
+    type: str = "content"
+    text: str = ""
+
+
+@dataclass
+class DoneStreamChunk:
+    type: str = "done"
+    thread_id: str = ""
+
+
+@dataclass
+class ErrorStreamChunk:
+    type: str = "error"
+    message: str = ""

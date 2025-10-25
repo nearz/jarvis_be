@@ -6,6 +6,9 @@ from .controller_models import (
     HistoryResult,
     ThreadMessagesResult,
     ThreadDeleteResult,
+    ContentStreamChunk,
+    DoneStreamChunk,
+    ErrorStreamChunk,
 )
 
 __all__ = [
@@ -16,4 +19,7 @@ __all__ = [
     "HistoryResult",
     "ThreadMessagesResult",
     "ThreadDeleteResult",
+    "ContentStreamChunk",
+    "DoneStreamChunk",
+    "ErrorStreamChunk",
 ]
