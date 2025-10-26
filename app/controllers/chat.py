@@ -3,11 +3,16 @@ from typing import Union
 
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, AIMessageChunk
 from langgraph.graph.state import CompiledStateGraph, RunnableConfig
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from ..agent.state import AgentState, ContextSchema
 from ..core.llm_utils.title_generator import generate_chat_title
 from ..core.llm_utils.normalize import get_msg_content_text
 from ..core.db_ops.app_db import AppDatabase, DatabaseException, MessageType
+from ..core.db_ops.agent_checkpoints_db import (
+    CheckpointDatabaseException,
+    thread_msg_list,
+)
 from ..core.logging import get_logger
 from ..models.controller_models import ChatResult, ErrorType
 from ..models.controller_models import (
@@ -19,15 +24,13 @@ from ..models.controller_models import (
 logger = get_logger(__name__)
 
 
-# TODO: Is there a better way to setup ainvoke params package? Maybe a func in state.
-# TODO: Consider DB operation order. LangGraph could save checkpoint, but saving to
-# app db could fail then would be out of sync. Can you roll back LangGraph, or retry
-# on app db?
+# TODO: After async iterator completes succesfully synce app db messages with checkpoint db.
 async def chat_controller(
     message: str,
     llm: str,
     user_id: str,
     app_db: AppDatabase,
+    saver: AsyncSqliteSaver,
     graph: CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState],
     *,
     thread_id: Union[str, None],
@@ -55,12 +58,23 @@ async def chat_controller(
             stream_mode="messages",
         ):
             if isinstance(msg, AIMessageChunk):
-                # TODO: Type of .content
-                yield ContentStreamChunk(text=msg.content)
+                # TODO: When type of content is list[str|dict]
+                if isinstance(msg.content, str):
+                    yield ContentStreamChunk(text=msg.content)
+                else:
+                    logger.debug(
+                        "msg content not just a string | content: %s", str(msg.content)
+                    )
 
         logger.info("Graph execution complete | thread_id: %s", thread_id)
 
         yield DoneStreamChunk(thread_id=thread_id)
+
+        result = await _thread_persistence(
+            thread_id, user_id, llm, new_thread, app_db, saver
+        )
+        if not result:
+            logger.debug("Failed to persist thread to App DB, needs investigation")
 
     except TimeoutError as e:
         logger.exception("Timeout error | thread_id: %s", thread_id)
@@ -74,143 +88,63 @@ async def chat_controller(
         )
         yield ErrorStreamChunk(message="Unexpected system error")
 
-    # try:
-    #     if not result or "messages" not in result:
-    #         logger.error("Invalid response structure | thread_id: %s", thread_id)
-    #         return ChatResult(
-    #             success=False,
-    #             thread_id=thread_id,
-    #             error_type=ErrorType.LLM_RESPONSE_PROCESSING_ERROR,
-    #             error_details="Invalid response from AI service",
-    #         )
-    #
-    #     messages = result["messages"]
-    #     if not messages:
-    #         logger.error("No messages in response | thread_id: %s", thread_id)
-    #         return ChatResult(
-    #             success=False,
-    #             thread_id=thread_id,
-    #             error_type=ErrorType.LLM_RESPONSE_PROCESSING_ERROR,
-    #             error_details="No response generated",
-    #         )
-    #
-    #     last_message = messages[-1]
-    #     if not hasattr(last_message, "content") or last_message.content is None:
-    #         logger.error("Empty message content | thread_id: %s", thread_id)
-    #         return ChatResult(
-    #             success=False,
-    #             thread_id=thread_id,
-    #             error_type=ErrorType.LLM_RESPONSE_PROCESSING_ERROR,
-    #             error_details="Empty response generated",
-    #         )
-    #
-    #     logger.info(
-    #         "Graph executed successfully | thread_id: %s | AI message preview: %s",
-    #         thread_id,
-    #         last_message.content[:400],
-    #     )
-    #
-    #     # TODO: How to handle insert false
-    #     if new_thread:
-    #         title = await generate_chat_title(message, last_message.content)
-    #         res = await app_db.create_user_thread(user_id, thread_id, title, llm)
-    #         if not res:
-    #             logger.error(
-    #                 "Failed to create user thread | user_id: %s | thread_id: %s",
-    #                 user_id,
-    #                 thread_id,
-    #             )
-    #             return ChatResult(
-    #                 success=False,
-    #                 thread_id=thread_id,
-    #                 error_type=ErrorType.DATABASE_ERROR,
-    #                 error_details="Failed to save conversation thread",
-    #             )
-    #
-    #     save_msgs_res = await _save_msgs_to_db(messages, llm, thread_id, app_db)
-    #     if not save_msgs_res:
-    #         logger.error(
-    #             "Failed to save thread messages | user_id: %s | thread_id: %s",
-    #             user_id,
-    #             thread_id,
-    #         )
-    #         return ChatResult(
-    #             success=False,
-    #             thread_id=thread_id,
-    #             error_type=ErrorType.DATABASE_ERROR,
-    #             error_details="Failed to save thread messages",
-    #         )
-    #
-    #     tua_res = await app_db.set_thread_updated(user_id, thread_id, llm)
-    #     if not tua_res:
-    #         logger.warning(
-    #             "Thread updated at failure | user_id: %s | thread_id: %s",
-    #             user_id,
-    #             thread_id,
-    #         )
-    #
-    #     return ChatResult(
-    #         success=True, message=last_message.content, thread_id=thread_id
-    #     )
-    #
-    # except DatabaseException as e:
-    #     logger.exception("Database exception occurred | thread_id: %s", thread_id)
-    #     return ChatResult(
-    #         success=False,
-    #         thread_id=thread_id,
-    #         error_type=ErrorType.DATABASE_ERROR,
-    #         error_details="Database exception occurred",
-    #     )
-    #
-    # except ValueError as e:
-    #     logger.exception("Value error occurred")
-    #     return ChatResult(
-    #         success=False,
-    #         thread_id=thread_id,
-    #         error_type=ErrorType.VALIDATION_ERROR,
-    #         error_details=str(e),
-    #     )
-    #
-    # except Exception as e:
-    #     logger.exception(
-    #         "Graph execution failed | thread_id: %s | error: %s", thread_id, str(e)
-    #     )
-    #     return ChatResult(
-    #         success=False,
-    #         thread_id=thread_id,
-    #         error_type=ErrorType.SYSTEM_ERROR,
-    #         error_details="Failed to process AI response",
-    #     )
 
-
-async def _save_msgs_to_db(
-    messages: list[BaseMessage], llm: str, thread_id: str, app_db: AppDatabase
+# TODO: Raising exceptions and returning bool for now, review for improvement.
+# TODO: Database operations more atomic?
+async def _thread_persistence(
+    thread_id: str,
+    user_id: str,
+    llm: str,
+    new_thread: bool,
+    app_db: AppDatabase,
+    saver: AsyncSqliteSaver,
 ) -> bool:
-    human_msg = _get_last_human_message(messages)
-    ai_msg = _get_last_ai_message(messages)
+    msg_list = await thread_msg_list(thread_id, saver)
+    if msg_list is None:
+        raise CheckpointDatabaseException("Could not fetch checkpoint thread messages")
 
-    if not human_msg or not isinstance(human_msg.id, str):
+    last_human_msg = _get_last_human_message(msg_list)
+    last_ai_msg = _get_last_ai_message(msg_list)
+
+    if not last_human_msg or not isinstance(last_human_msg.id, str):
         raise ValueError("Invalid human message or missing message ID")
 
-    if not ai_msg or not isinstance(ai_msg.id, str):
+    if not last_ai_msg or not isinstance(last_ai_msg.id, str):
         raise ValueError("Invalid AI message or missing message ID")
 
+    human_msg_txt = get_msg_content_text(last_human_msg.content)
+    ai_msg_txt = get_msg_content_text(last_ai_msg.content)
+
+    # New Thread
+    # Generate title, create thread, save messages, thread updated at
+    if new_thread:
+        title = await generate_chat_title(human_msg_txt, ai_msg_txt)
+        res = await app_db.create_user_thread(user_id, thread_id, title, llm)
+        if not res:
+            logger.error(
+                "Failed to create user thread | user_id: %s | thread_id: %s",
+                user_id,
+                thread_id,
+            )
+            return False
+
+    # Existing Thread
+    # save messages, thread updated at
     msg_one_res = await app_db.create_thread_msg(
-        get_msg_content_text(human_msg.content),
+        human_msg_txt,
         MessageType.USER.value,
         llm,
-        human_msg.id,
+        last_human_msg.id,
         thread_id,
     )
 
     msg_two_res = await app_db.create_thread_msg(
-        get_msg_content_text(ai_msg.content),
+        ai_msg_txt,
         MessageType.AI.value,
         llm,
-        ai_msg.id,
+        last_ai_msg.id,
         thread_id,
     )
-
     if not (msg_one_res and msg_two_res):
         return False
 
@@ -225,7 +159,7 @@ def _get_last_human_message(messages: list[BaseMessage]) -> Union[HumanMessage, 
 
 
 def _get_last_ai_message(messages: list[BaseMessage]) -> Union[AIMessage, None]:
-    last_msg = messages[-1]
-    if isinstance(last_msg, AIMessage):
-        return last_msg
+    for msg in reversed(messages):
+        if isinstance(msg, AIMessage):
+            return msg
     return None

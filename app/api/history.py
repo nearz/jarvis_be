@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .dependencies import (
     get_current_user,
     get_app_db,
     thread_validation,
-    get_checkpoints_db,
+    get_graph_saver,
 )
 from ..controllers.history import (
     history_controller,
@@ -15,7 +16,6 @@ from ..controllers.history import (
 from ..models import User
 from ..models.response_models import HistoryResponse, ThreadHistoryResponse
 from ..core.db_ops.app_db import AppDatabase
-from ..core.db_ops.agent_checkpoints_db import CheckpointDatabase
 from ..core.logging import get_logger
 from .errors import create_error_response
 
@@ -81,9 +81,9 @@ async def delete_thread(
     thread_id: str = Depends(thread_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
-    checkpoints_db: CheckpointDatabase = Depends(get_checkpoints_db),
+    saver: AsyncSqliteSaver = Depends(get_graph_saver),
 ):
-    result = await delete_thread_controller(user.id, thread_id, app_db, checkpoints_db)
+    result = await delete_thread_controller(user.id, thread_id, app_db, saver)
 
     if not result.success:
         logger.error(

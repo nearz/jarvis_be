@@ -1,69 +1,39 @@
 import aiosqlite
+from typing import Union
 from contextlib import asynccontextmanager
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langchain_core.messages import BaseMessage
+from langgraph.graph.state import RunnableConfig
 
 from ..logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class DatabaseException(Exception):
-    """Raised when database operation fails"""
-
-    pass
+class CheckpointDatabaseException(Exception):
+    """Raised when accessing checkpoint fails"""
 
 
-class CheckpointDatabase:
-    def __init__(self, connection: aiosqlite.Connection):
-        self.conn = connection
+async def thread_msg_list(
+    thread_id: str, saver: AsyncSqliteSaver
+) -> Union[list[BaseMessage], None]:
+    try:
+        config = RunnableConfig({"configurable": {"thread_id": thread_id}})
+        checkpoint = await saver.aget(config=config)
 
-    @asynccontextmanager
-    async def transaction(self):
-        """
-        Context manager for database transactions.
-        Automatically commits on success, rolls back on error.
-        """
-        try:
-            yield
-            await self.conn.commit()
-        except BaseException as e:
-            logger.debug(
-                "Database transaction failed, rolling back: %s", type(e).__name__
-            )
-            try:
-                await self.conn.rollback()
-            except Exception as rollback_error:
-                logger.exception("Rollback failed: %s", rollback_error)
-            raise
+        if checkpoint is None:
+            return None
 
-    async def delete_thread(self, thread_id: str):
-        try:
-            async with self.transaction():
-                await self.conn.execute(
-                    "DELETE FROM checkpoints WHERE thread_id = ?",
-                    (thread_id,),
-                )
-                await self.conn.execute(
-                    "DELETE FROM writes WHERE thread_id = ?",
-                    (thread_id,),
-                )
-        except aiosqlite.OperationalError as e:
-            logger.error(
-                "Delete thread failed - operational error | thread_id: %s | error: %s",
-                thread_id,
-                str(e),
-            )
-            raise DatabaseException(f"Database operational error: {e}") from e
-        except aiosqlite.DatabaseError as e:
-            logger.error(
-                "Delete thread failed - database error | thread_id: %s | error: %s",
-                thread_id,
-                str(e),
-            )
-            raise DatabaseException(f"Database error: {e}") from e
-        except Exception as e:
-            logger.exception(
-                "Delete thread failed - unexpected error | thread_id: %s",
-                thread_id,
-            )
-            raise DatabaseException(f"Unexpected database error: {e}") from e
+        return checkpoint["channel_values"]["messages"]
+
+    except Exception as e:
+        logger.exception("Unexpected system error")
+        raise
+
+
+async def delete_checkpoint_thread(thread_id: str, saver: AsyncSqliteSaver) -> None:
+    try:
+        await saver.adelete_thread(thread_id)
+    except Exception as e:
+        logger.exception("Unexpected system error")
+        raise

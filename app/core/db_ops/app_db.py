@@ -342,6 +342,36 @@ class AppDatabase:
             )
             raise DatabaseException(f"Unexpected database error: {e}") from e
 
+    async def thread_exists(self, thread_id: str) -> bool:
+        try:
+            async with self.conn.execute(
+                """SELECT 1 FROM user_threads
+                WHERE thread_id = ?""",
+                (thread_id,),
+            ) as cursor:
+                res = await cursor.fetchone()
+                return res is not None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Thread exists check failed - operational error | thread_id: %s | error: %s",
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Thread exists check failed - database error | thread_id: %s | error: %s",
+                thread_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Thread exists check failed - unexpected error | thread_id: %s",
+                thread_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
     async def create_thread_msg(
         self, content: str, msg_type: str, llm: str, msg_id: str, thread_id: str
     ) -> bool:

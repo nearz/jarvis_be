@@ -16,10 +16,6 @@ def get_app_graph(req: Request):
     return req.app.state.graph
 
 
-def get_checkpoints_db(req: Request):
-    return req.app.state.checkpoints_db
-
-
 def get_graph_saver(req: Request):
     return req.app.state.saver
 
@@ -90,18 +86,14 @@ async def get_current_user(
 async def thread_validation(
     thread_id: str,
     app_db: AppDatabase = Depends(get_app_db),
-    saver=Depends(get_graph_saver),
     user=Depends(get_current_user),
 ) -> str:
     thread_id = thread_id.strip()
     logger.info("Validating thread | thread_id: %s | user_id: %s", thread_id, user.id)
     try:
         UUID(thread_id)
+        thread_does_exist = await app_db.thread_exists(thread_id)
         thread_owned = await app_db.verify_thread_ownership(user.id, thread_id)
-
-        config = RunnableConfig({"configurable": {"thread_id": thread_id}})
-        lg_thread = await saver.aget(config)
-        lg_thread_exists = True if lg_thread else False
 
     except ValueError:
         logger.warning(
@@ -127,23 +119,21 @@ async def thread_validation(
             detail="Unexpected system error",
         )
 
+    if not thread_does_exist:
+        logger.warning(
+            "Thread does not exist | thread_id: %s | user_id: %s",
+            thread_id,
+            user.id,
+        )
+        raise HTTPException(status_code=404, detail="Thread does not exist")
+
     if not thread_owned:
         logger.warning(
-            "Thread does not exist or not owned by user | thread_id: %s | user_id: %s",
+            "Thread is not owned by user | thread_id: %s | user_id: %s",
             thread_id,
             user.id,
         )
         raise HTTPException(status_code=403, detail="User cannot access thread")
-
-    if not lg_thread_exists:
-        logger.warning(
-            "Thread does not exist in LangGraph checkpoints | thread_id: %s | user_id: %s",
-            thread_id,
-            user.id,
-        )
-        raise HTTPException(
-            status_code=404, detail="LangGraph checkpoint does not exist"
-        )
 
     logger.info("Thread validated | thread_id: %s | user_id: %s", thread_id, user.id)
     return thread_id

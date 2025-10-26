@@ -1,5 +1,7 @@
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
 from ..core.db_ops.app_db import AppDatabase, DatabaseException
-from ..core.db_ops.agent_checkpoints_db import CheckpointDatabase
+from ..core.db_ops.agent_checkpoints_db import delete_checkpoint_thread
 from ..models import Thread, ThreadMessage
 from ..models.controller_models import (
     HistoryResult,
@@ -109,11 +111,11 @@ async def delete_thread_controller(
     user_id: str,
     thread_id: str,
     app_db: AppDatabase,
-    checkpoints_db: CheckpointDatabase,
+    saver: AsyncSqliteSaver,
 ) -> ThreadDeleteResult:
     try:
         await app_db.delete_thread(thread_id, user_id)
-        await checkpoints_db.delete_thread(thread_id)
+        await delete_checkpoint_thread(thread_id, saver)
 
         return ThreadDeleteResult(success=True)
 
