@@ -82,8 +82,6 @@ async def get_current_user(
     return User(id=user["id"], email=user["email"])
 
 
-# TODO: Check thread existence in LG checpoints as well. If it does not exist could
-# restore from the app db.
 async def thread_validation(
     thread_id: str,
     app_db: AppDatabase = Depends(get_app_db),

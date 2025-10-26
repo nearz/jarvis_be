@@ -19,7 +19,6 @@ class DatabaseException(Exception):
     pass
 
 
-# TODO: Consider changes when moving to Postgres
 class AppDatabase:
     def __init__(self, connection: aiosqlite.Connection):
         self.conn = connection

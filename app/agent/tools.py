@@ -17,7 +17,6 @@ def register_tool(func):
     return decorated
 
 
-# TODO: Should I consider adding max_results as param?
 @register_tool
 async def tavily_search(query: str) -> str:
     """

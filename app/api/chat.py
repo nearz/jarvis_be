@@ -1,8 +1,10 @@
 import json
 from dataclasses import asdict
+from typing import Union
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.graph.state import CompiledStateGraph
 
 from .dependencies import (
     get_app_graph,
@@ -11,6 +13,7 @@ from .dependencies import (
     get_app_db,
     thread_validation,
 )
+from ..agent.state import AgentState, ContextSchema
 from ..models.request_models import ChatRequest
 from ..models import User
 from ..controllers.chat import chat_controller
@@ -58,9 +61,18 @@ async def chat_thread(
     )
 
 
-# TODO: Improve exception handling
-# TODO: Add type hints
-async def _event_generator(message, llm, user_id, app_db, saver, graph, thread_id):
+async def _event_generator(
+    message: str,
+    llm: str,
+    user_id: str,
+    app_db: AppDatabase,
+    saver: AsyncSqliteSaver,
+    graph: CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState],
+    thread_id: Union[str, None],
+):
+    logger.info(
+        "Starting even generator | thread_id: %s | user_id: %s", thread_id, user_id
+    )
     try:
         async for chunk in chat_controller(
             message, llm, user_id, app_db, saver, graph, thread_id=thread_id
@@ -69,11 +81,21 @@ async def _event_generator(message, llm, user_id, app_db, saver, graph, thread_i
                 data = json.dumps(asdict(chunk))
                 yield f"data: {data}\n\n"
             except Exception as e:
+                logger.exception(
+                    "Exception occured while streaming | thread_id: %s | user_id: %s",
+                    thread_id,
+                    user_id,
+                )
                 err_data = json.dumps(
                     {"type": "error", "message": "Unexpected system error"}
                 )
                 yield f"data: {err_data}\n\n"
                 break
     except Exception as e:
+        logger.exception(
+            "Exception occured while streaming | thread_id: %s | user_id: %s",
+            thread_id,
+            user_id,
+        )
         err_data = json.dumps({"type": "error", "message": "Unexpected system error"})
         yield f"data: {err_data}\n\n"

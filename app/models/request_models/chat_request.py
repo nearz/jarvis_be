@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 
 
-# TODO: Can I verify that llm model value is correct from selection
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
     llm: str = Field(min_length=1)

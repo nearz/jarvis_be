@@ -6,7 +6,6 @@ from starlette.requests import Request
 from ..core.logging import get_logger, request_id_var
 
 
-# TODO: What other logging features to add, ignore routers, query params, etc.
 class LoggingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):
         super().__init__(app)

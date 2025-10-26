@@ -9,7 +9,6 @@ from ..logging import get_logger
 logger = get_logger(__name__)
 
 
-# NOTE: Consider changing to list of messages as input
 async def generate_chat_title(
     human_msg: str, ai_msg: str, model: str = "gpt-4o-mini"
 ) -> str:
@@ -35,12 +34,3 @@ async def generate_chat_title(
     except Exception as e:
         logger.exception("Exception occurred in title generation")
         return settings.DEFAULT_CHAT_TITLE
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    hm = "Why is the sky blue"
-    am = "The sky appears blue because molecules in Earth’s atmosphere scatter sunlight, and shorter wavelengths (blue light) are scattered more strongly than longer wavelengths (red light). This effect is called Rayleigh scattering."
-    res = asyncio.run(generate_chat_title(hm, am))
-    print(f"Title: {res}")

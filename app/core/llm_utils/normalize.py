@@ -1,8 +1,6 @@
 from typing import Union
 
 
-# TODO: This just normalizes text content. How to handle other types of data
-# that can be returned.
 def get_msg_content_text(content: Union[str, list[Union[str, dict]]]) -> str:
     if isinstance(content, str):
         return content

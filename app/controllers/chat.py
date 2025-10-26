@@ -24,7 +24,6 @@ from ..models.controller_models import (
 logger = get_logger(__name__)
 
 
-# TODO: After async iterator completes succesfully synce app db messages with checkpoint db.
 async def chat_controller(
     message: str,
     llm: str,

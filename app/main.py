@@ -19,7 +19,6 @@ setup_logging(settings.LOG_LEVEL)
 logger = get_logger(__name__)
 
 
-# TODO: Test the exceptions in mocks
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
