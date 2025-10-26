@@ -1,7 +1,7 @@
 import logging
 import sys
 from contextvars import ContextVar
-from typing import Any, Optional
+from typing import Optional
 
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")

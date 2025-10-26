@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, TypedDict
+from typing import TypedDict
 
 import jwt
 from fastapi import HTTPException

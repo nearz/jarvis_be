@@ -1,6 +1,5 @@
-from langchain_core.messages import HumanMessage, BaseMessage
+from langchain_core.messages import HumanMessage
 
-# from ..config import settings
 from .normalize import get_msg_content_text
 from .client import get_llm_client
 from .prompts import TITLE_GEN_PROMPT

@@ -1,7 +1,4 @@
-import logging
-import os
 from langchain_core.tools import tool, BaseTool
-from tavily import TavilyClient
 
 from .tavily_client import get_async_tavily_client, MissingApiKey
 from ..core.logging import get_logger

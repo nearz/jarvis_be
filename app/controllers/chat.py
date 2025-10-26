@@ -14,7 +14,7 @@ from ..core.db_ops.agent_checkpoints_db import (
     thread_msg_list,
 )
 from ..core.logging import get_logger
-from ..models.controller_models import ChatResult, ErrorType
+from ..models.controller_models import ErrorType
 from ..models.controller_models import (
     ContentStreamChunk,
     ErrorStreamChunk,
