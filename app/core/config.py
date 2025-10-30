@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     TOKEN_EXP: int
 
     LOG_LEVEL: str = "INFO"
+    LOG_DIR: str = "logs"
 
     TAVILY_API_KEY: str
 

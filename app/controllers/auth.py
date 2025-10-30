@@ -21,6 +21,8 @@ async def register_controller(
 ) -> AuthResult:
 
     try:
+        hsh_pwrd = hash_password(password)
+
         if await app_db.user_email_exists(email):
             logger.warning("Registration failure")
             return AuthResult(
@@ -30,7 +32,6 @@ async def register_controller(
             )
 
         new_user_id = str(uuid.uuid4())
-        hsh_pwrd = hash_password(password)
 
         res = await app_db.create_user(new_user_id, email, hsh_pwrd)
 

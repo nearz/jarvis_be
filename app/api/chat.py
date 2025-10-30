@@ -73,29 +73,20 @@ async def _event_generator(
     logger.info(
         "Starting even generator | thread_id: %s | user_id: %s", thread_id, user_id
     )
-    try:
-        async for chunk in chat_controller(
-            message, llm, user_id, app_db, saver, graph, thread_id=thread_id
-        ):
-            try:
-                data = json.dumps(asdict(chunk))
-                yield f"data: {data}\n\n"
-            except Exception as e:
-                logger.exception(
-                    "Exception occured while streaming | thread_id: %s | user_id: %s",
-                    thread_id,
-                    user_id,
-                )
-                err_data = json.dumps(
-                    {"type": "error", "message": "Unexpected system error"}
-                )
-                yield f"data: {err_data}\n\n"
-                break
-    except Exception as e:
-        logger.exception(
-            "Exception occured while streaming | thread_id: %s | user_id: %s",
-            thread_id,
-            user_id,
-        )
-        err_data = json.dumps({"type": "error", "message": "Unexpected system error"})
-        yield f"data: {err_data}\n\n"
+    async for chunk in chat_controller(
+        message, llm, user_id, app_db, saver, graph, thread_id=thread_id
+    ):
+        try:
+            data = json.dumps(asdict(chunk))
+            yield f"data: {data}\n\n"
+        except Exception as e:
+            logger.exception(
+                "Exception occured while streaming | thread_id: %s | user_id: %s",
+                thread_id,
+                user_id,
+            )
+            err_data = json.dumps(
+                {"type": "error", "message": "Unexpected system error"}
+            )
+            yield f"data: {err_data}\n\n"
+            break

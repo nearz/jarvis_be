@@ -196,22 +196,23 @@ class AppDatabase:
 
     async def create_user_thread(
         self, user_id: str, thread_id: str, title: str, last_llm_used: str
-    ) -> bool:
+    ) -> None:
         try:
-            async with self.transaction():
-                await self.conn.execute(
-                    """INSERT INTO user_threads (user_id, thread_id, title, last_llm_used)
-                    VALUES(?, ?, ?, ?)""",
-                    (user_id, thread_id, title, last_llm_used),
-                )
-            return True
-        except aiosqlite.IntegrityError:
+            await self.conn.execute(
+                """INSERT INTO user_threads (user_id, thread_id, title, last_llm_used)
+                    VALUES(?, ?, ?, ?)
+                    ON CONFLICT(thread_id) DO NOTHING""",
+                (user_id, thread_id, title, last_llm_used),
+            )
+            return
+        except aiosqlite.IntegrityError as e:
             logger.warning(
-                "Create user thread failed - integrity constraint | user_id: %s | thread_id: %s",
+                "Create user thread failed - integrity constraint | user_id: %s | thread_id: %s | error: %s",
                 user_id,
                 thread_id,
+                str(e),
             )
-            return False
+            raise DatabaseException(f"Database integrity error: {e}") from e
         except aiosqlite.OperationalError as e:
             logger.error(
                 "Create user thread failed - operational error | user_id: %s | thread_id: %s | error: %s",
@@ -265,25 +266,23 @@ class AppDatabase:
             )
             raise DatabaseException(f"Unexpected database error: {e}") from e
 
-    # No DatabaseExceptions: Leave as return False for any exceptions so does not block login.
     async def set_thread_updated(
         self, user_id: str, thread_id: str, last_llm_used: str
-    ) -> bool:
+    ) -> None:
         try:
-            async with self.transaction():
-                await self.conn.execute(
-                    """UPDATE user_threads SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), last_llm_used = ?
+            await self.conn.execute(
+                """UPDATE user_threads SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), last_llm_used = ?
                     WHERE user_id = ? AND thread_id = ?""",
-                    (last_llm_used, user_id, thread_id),
-                )
-            return True
-        except aiosqlite.IntegrityError:
+                (last_llm_used, user_id, thread_id),
+            )
+            return
+        except aiosqlite.IntegrityError as e:
             logger.warning(
                 "Set thread updated_at failed - integrity constraint | user_id: %s | thread_id: %s",
                 user_id,
                 thread_id,
             )
-            return False
+            raise DatabaseException(f"Database integrity error: {e}") from e
         except aiosqlite.OperationalError as e:
             logger.error(
                 "Set thread updated_at failed - operational error | user_id: %s | thread_id: %s | error: %s",
@@ -291,7 +290,7 @@ class AppDatabase:
                 thread_id,
                 str(e),
             )
-            return False
+            raise DatabaseException(f"Database operational error: {e}") from e
         except aiosqlite.DatabaseError as e:
             logger.error(
                 "Set thread updated_at failed - database error | user_id: %s | thread_id: %s | error: %s",
@@ -299,14 +298,14 @@ class AppDatabase:
                 thread_id,
                 str(e),
             )
-            return False
+            raise DatabaseException(f"Database error: {e}") from e
         except Exception as e:
             logger.exception(
                 "Set thread updated_at failed - unexpected error | user_id: %s | thread_id: %s",
                 user_id,
                 thread_id,
             )
-            return False
+            raise DatabaseException(f"Unexpected database error: {e}") from e
 
     async def verify_thread_ownership(self, user_id: str, thread_id: str) -> bool:
         try:
@@ -373,20 +372,20 @@ class AppDatabase:
 
     async def create_thread_msg(
         self, content: str, msg_type: str, llm: str, msg_id: str, thread_id: str
-    ) -> bool:
+    ) -> None:
         try:
-            async with self.transaction():
-                await self.conn.execute(
-                    """INSERT INTO thread_messages 
+            await self.conn.execute(
+                """INSERT INTO thread_messages 
                    (content, message_type, llm, message_index, message_id, thread_id)
                     SELECT ?, ?, ?, 
                        COALESCE(MAX(message_index), 0) + 1,
                        ?, ?
                     FROM thread_messages 
-                    WHERE thread_id = ?""",
-                    (content, msg_type, llm, msg_id, thread_id, thread_id),
-                )
-            return True
+                    WHERE thread_id = ?
+                    ON CONFLICT(thread_id, message_id) DO NOTHING""",
+                (content, msg_type, llm, msg_id, thread_id, thread_id),
+            )
+            return
         except aiosqlite.IntegrityError as e:
             logger.warning(
                 "Create thread message failed - integrity constraint | thread_id: %s | message_id: %s | error: %s",
@@ -394,7 +393,7 @@ class AppDatabase:
                 msg_id,
                 str(e),
             )
-            return False
+            raise DatabaseException(f"Database integrity error: {e}") from e
         except aiosqlite.OperationalError as e:
             logger.error(
                 "Create thread message failed - operational error | thread_id: %s | message_id: %s | error: %s",
@@ -531,7 +530,7 @@ async def init_app_db(conn: aiosqlite.Connection):
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
         thread_id TEXT UNIQUE NOT NULL,
-        title TEXT DEFAULT 'New Chat',
+        title TEXT,
         last_llm_used TEXT,
         updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), 

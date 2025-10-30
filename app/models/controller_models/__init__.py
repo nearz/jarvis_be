@@ -1,7 +1,6 @@
 from .controller_models import (
     ErrorType,
     BaseResult,
-    ChatResult,
     AuthResult,
     HistoryResult,
     ThreadMessagesResult,
@@ -14,7 +13,6 @@ from .controller_models import (
 __all__ = [
     "ErrorType",
     "BaseResult",
-    "ChatResult",
     "AuthResult",
     "HistoryResult",
     "ThreadMessagesResult",

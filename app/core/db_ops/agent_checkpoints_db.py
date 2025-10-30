@@ -19,13 +19,10 @@ async def thread_msg_list(
         config = RunnableConfig({"configurable": {"thread_id": thread_id}})
         checkpoint = await saver.aget(config=config)
 
-        if checkpoint is None:
-            return None
-
-        return checkpoint["channel_values"]["messages"]
+        return checkpoint["channel_values"]["messages"] if checkpoint else None
 
     except Exception as e:
-        logger.exception("Unexpected system error")
+        logger.exception("Fetching checkpoint messages: Unexpected system error")
         raise
 
 
@@ -33,5 +30,5 @@ async def delete_checkpoint_thread(thread_id: str, saver: AsyncSqliteSaver) -> N
     try:
         await saver.adelete_thread(thread_id)
     except Exception as e:
-        logger.exception("Unexpected system error")
+        logger.exception("Fetching checkpoint messages: Unexpected system error")
         raise

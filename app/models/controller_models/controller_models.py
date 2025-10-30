@@ -24,12 +24,6 @@ class BaseResult:
 
 
 @dataclass
-class ChatResult(BaseResult):
-    message: Optional[str] = None
-    thread_id: Optional[str] = None
-
-
-@dataclass
 class AuthResult(BaseResult):
     token: Optional[Token] = None
 
