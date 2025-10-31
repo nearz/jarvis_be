@@ -59,3 +59,50 @@ def log_failed_persistence(
             str(error),
             str(log_error),
         )
+
+
+def read_failed_persistence_log(
+    filter_user_id: Optional[str] = None,
+    filter_error_type: Optional[str] = None,
+) -> list[dict]:
+
+    if not FAILED_PERSISTENCE_LOG.exists():
+        return []
+    
+    entries = []
+    
+    try:
+        with open(FAILED_PERSISTENCE_LOG, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line.strip())
+                    
+                    # Apply filters
+                    if filter_user_id and entry.get("user_id") != filter_user_id:
+                        continue
+                    if filter_error_type and entry.get("error_type") != filter_error_type:
+                        continue
+                    
+                    entries.append(entry)
+                    
+                except json.JSONDecodeError as e:
+                    logger.warning("Failed to parse log entry: %s", str(e))
+                    continue
+        
+        return entries
+        
+    except Exception as e:
+        logger.error("Failed to read failed persistence log: %s", str(e))
+        return []
+
+
+def count_failed_persistence() -> int:
+    if not FAILED_PERSISTENCE_LOG.exists():
+        return 0
+    
+    try:
+        with open(FAILED_PERSISTENCE_LOG, "r", encoding="utf-8") as f:
+            return sum(1 for _ in f)
+    except Exception as e:
+        logger.error("Failed to count log entries: %s", str(e))
+        return 0
