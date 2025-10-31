@@ -1,4 +1,4 @@
-import logging
+from logging import INFO
 from uuid import uuid4
 from typing import Union
 import asyncio
@@ -34,7 +34,6 @@ from ..models.controller_models import (
 )
 
 logger = get_logger(__name__)
-retry_logger = logging.getLogger(__name__)
 
 
 async def chat_controller(
@@ -201,7 +200,7 @@ def _should_retry(exception) -> bool:
     stop=stop_after_attempt(5),
     retry=retry_if_exception(_should_retry),
     wait=wait_random_exponential(multiplier=1, max=10),
-    before_sleep=before_sleep_log(retry_logger, logging.INFO),
+    before_sleep=before_sleep_log(logger.logger, INFO),
     reraise=True,
 )
 async def _thread_persistence(
