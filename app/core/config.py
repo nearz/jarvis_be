@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     LOG_DIR: str = "logs"
 
     TAVILY_API_KEY: str
+    ANTHROPIC_API_KEY: str
 
     DEFAULT_CHAT_TITLE: str = "Jarvis Chat"
 
