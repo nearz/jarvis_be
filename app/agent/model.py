@@ -12,9 +12,12 @@ from .tools import get_tools
 # TODO: Raise exceptions when model not supported?
 def get_model(input_model: str) -> Union[BaseChatModel, Runnable]:
     model = supported_models.get(input_model, None)
-    if model:
-        model_str = f"{model['provider_string']}:{model['model_string']}"
-        init_model = init_chat_model(model_str)
-        if model["tool_support"]:
-            return init_model.bind_tools(get_tools())
-        return init_model
+
+    if model is None:
+        raise ValueError(f"Unsupported llm: {input_model}")
+
+    model_str = f"{model['provider_string']}:{model['model_string']}"
+    init_model = init_chat_model(model_str)
+    if model["tool_support"]:
+        return init_model.bind_tools(get_tools())
+    return init_model

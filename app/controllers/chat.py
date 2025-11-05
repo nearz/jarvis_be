@@ -86,6 +86,10 @@ async def chat_controller(
             )
         )
 
+    except ValueError as e:
+        logger.exception("Configuration error | thread_id: %s", thread_id)
+        yield ErrorStreamChunk(message="Configuration error")
+
     except TimeoutError as e:
         logger.exception("Timeout error | thread_id: %s", thread_id)
         yield ErrorStreamChunk(message="Graph execution timeout")
