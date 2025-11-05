@@ -70,12 +70,12 @@ async def chat_controller(
         ):
             if isinstance(msg, AIMessageChunk):
                 # TODO: When type of content is list[str|dict]
+                # TODO: Need more research on different types of content
+                # Right now content will be str only or text will be extracted.
                 if isinstance(msg.content, str):
                     yield ContentStreamChunk(text=msg.content)
                 else:
-                    logger.debug(
-                        "msg content not just a string | content: %s", str(msg.content)
-                    )
+                    yield ContentStreamChunk(text=get_msg_content_text(msg.content))
 
         yield DoneStreamChunk(thread_id=thread_id)
         logger.info("Graph execution complete | thread_id: %s", thread_id)
@@ -253,7 +253,6 @@ async def _thread_persistence(
             last_ai_msg.id,
             thread_id,
         )
-    logger.info("Thread persistence successful | thread_id: %s", thread_id)
 
 
 def _get_last_human_message(messages: list[BaseMessage]) -> Union[HumanMessage, None]:

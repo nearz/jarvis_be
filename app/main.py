@@ -15,6 +15,10 @@ from .core.logging import setup_logging, get_logger
 from .core.db_ops.app_db import init_app_db, AppDatabase
 from .middleware import LoggingMiddleware
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 setup_logging(settings.LOG_LEVEL)
 logger = get_logger(__name__)
 

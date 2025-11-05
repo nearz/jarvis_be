@@ -8,9 +8,10 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
 from langgraph.prebuilt import ToolNode
 
-from .model import get_model_with_tools
+from .model import get_model
 from .tools import get_tools
 from ..core.logging import get_logger
+from ..core.llm_utils.prompts import GRAPH_SYSTEM_PROMPT
 
 logger = get_logger(__name__)
 
@@ -24,14 +25,15 @@ class ContextSchema:
     llm: str
 
 
+# TODO: What if exception is raised inside a node?
+
+
 async def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
     logger.debug("LLM call started | llm: %s", runtime.context.llm)
 
-    system_prompt = SystemMessage(
-        "You are an AI assistant, please answer my query to the best of your ability"
-    )
+    system_prompt = SystemMessage(GRAPH_SYSTEM_PROMPT)
 
-    llm = get_model_with_tools(runtime.context.llm)
+    llm = get_model(runtime.context.llm)
     all_msgs = [system_prompt] + list(state["messages"])
     response = await llm.ainvoke(all_msgs)
 

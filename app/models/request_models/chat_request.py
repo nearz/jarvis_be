@@ -1,6 +1,7 @@
+from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
-from datetime import datetime
+from app.agent.supported_models import supported_models
 
 
 class ChatRequest(BaseModel):
@@ -14,6 +15,14 @@ class ChatRequest(BaseModel):
         if not v.strip():
             raise ValueError("Field cannot be empty or only whitespace")
         return v.strip()
+
+    @field_validator("llm")
+    @classmethod
+    def validate_supported_llm(cls, v: str):
+        v = v.strip()
+        if v not in supported_models:
+            raise ValueError("Not a supported llm")
+        return v
 
     class Config:
         json_schema = {

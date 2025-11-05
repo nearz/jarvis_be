@@ -8,13 +8,61 @@ logger = get_logger(__name__)
 _TOOLS_REGISTRY = []
 
 TAVILY_MAX_RESULTS = 5
-TAVILY_TIMEOUT = 15
+TAVILY_SEARCH_TIMEOUT = 15
+TAVILY_EXTRACT_TIMEOUT = 15.0
 
 
 def register_tool(func):
     decorated = tool(func)
     _TOOLS_REGISTRY.append(decorated)
     return decorated
+
+
+@register_tool
+async def tavily_extract(urls: list[str]) -> str:
+    """
+    Extract web page content from one or more specified URLs
+
+    Args:
+        urls: list of urls to extract content from
+
+    Returns:
+        A formatted string containing extraction results
+    """
+    try:
+        client = get_async_tavily_client()
+    except MissingApiKey as e:
+        logger.exception("Tavily API key not set")
+        return f"Error: {e}"
+
+    try:
+        resp = await client.extract(
+            urls=urls,
+            include_images=False,
+            extract_depth="advanced",
+            format="markdown",
+            timeout=TAVILY_EXTRACT_TIMEOUT,
+        )
+
+        results = (resp or {}).get("results", [])
+        if not results:
+            logger.warning("No results for url extraction")
+            return "No results for url extraction"
+
+        logger.info("Tavily extraction complete")
+
+        lines = ["Extraction Results: "]
+        for r in results:
+            title = r.get("title", "No Title")
+            url = r.get("url", "No URL")
+            content = r.get("raw_content", "").strip()
+            lines.append(f"- **{title}**\n {url}\n {content}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.exception("Tavily extract failed")
+        return f"Error performing Tavily search: {e}"
 
 
 @register_tool
@@ -39,7 +87,7 @@ async def tavily_search(query: str) -> str:
             query,
             search_depth="advanced",
             max_results=TAVILY_MAX_RESULTS,
-            timeout=TAVILY_TIMEOUT,
+            timeout=TAVILY_SEARCH_TIMEOUT,
         )
 
         results = (resp or {}).get("results", [])
