@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 from langchain_core.tools import tool, BaseTool
 
 from .tavily_client import get_async_tavily_client, MissingApiKey
@@ -28,6 +29,11 @@ async def tavily_extract(url: str) -> str:
     """
     if not url:
         return "Error: No URL provided for extraction"
+
+    is_valid, err_msg = validate_url(url)
+    if not is_valid:
+        logger.warning("Invalid URL for extraction | url: %s | error: %s", url, err_msg)
+        return f"Error: {err_msg}"
 
     try:
         client = get_async_tavily_client()
@@ -63,6 +69,28 @@ async def tavily_extract(url: str) -> str:
     except Exception as e:
         logger.exception("Tavily extract failed")
         return f"Error performing Tavily extract: {e}"
+
+
+def validate_url(url: str) -> tuple[bool, str]:
+    if not url or not isinstance(url, str):
+        return False, "No URL provided"
+
+    if len(url) > 2048:
+        return False, "URL exceeds max length (2048 characters)"
+
+    try:
+        parsed = urlparse(url)
+
+        if not parsed.scheme or not parsed.netloc:
+            return False, "Invalid URL format (must include protocol and domain)"
+
+        if parsed.scheme != "https":
+            return False, f"Unsupported protocol '{parsed.scheme}' (only https allowed)"
+
+        return True, ""
+
+    except Exception as e:
+        return False, "Malformed URL"
 
 
 @register_tool
