@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     LOG_DIR: str = "logs"
 
     TAVILY_API_KEY: str
-    TAVILY_MAX_RESULTS: int = 5
+    TAVILY_MAX_RESULTS: int = 10
     TAVILY_SEARCH_TIMEOUT: int = 15
     TAVILY_EXTRACT_TIMEOUT: float = 15.0
 
