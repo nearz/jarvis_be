@@ -1,18 +1,30 @@
-"""
-OpenAI:
-gpt-4o
-gpt-4o-mini
-gpt-4.1
-gpt-4.1-mini
-gpt-4.1-nano
+from pydantic import BaseModel, Field, ValidationError
+from typing import Literal
 
-Anthropic:
-claude-sonnet-4-5
-claude-haiku-4-5
-claude-opus-4-1
-"""
 
-supported_models = {
+class ModelConfig(BaseModel):
+    provider: Literal["openai", "anthropic"]
+    model: str
+    tool_support: bool
+
+
+def validate_models(models: dict) -> dict[str, ModelConfig]:
+    validated = {}
+    errs = []
+
+    for model_name, config in models.items():
+        try:
+            validated[model_name] = ModelConfig(**config)
+        except ValidationError as e:
+            errs.append(f"Invalid config for '{model_name}': {e}")
+
+    if errs:
+        raise ValueError("Model configuration failed: \n" + "\n".join(errs))
+
+    return validated
+
+
+supported_models_raw = {
     "gpt-4o": {
         "provider_string": "openai",
         "model_string": "gpt-4o",
@@ -54,3 +66,5 @@ supported_models = {
         "tool_support": True,
     },
 }
+
+supported_models = validate_models(supported_models_raw)

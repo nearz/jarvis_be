@@ -1,5 +1,9 @@
 from urllib.parse import urlparse
+import re
+from re import Match
+
 from langchain_core.tools import tool, BaseTool
+import bleach
 
 from .tavily_client import get_async_tavily_client, MissingApiKey
 from ..core.logging import get_logger
@@ -61,7 +65,7 @@ async def tavily_extract(url: str) -> str:
         for r in results:
             title = r.get("title", "No Title")
             url = r.get("url", "No URL")
-            content = r.get("raw_content", "").strip()
+            content = sanitize_markdown(r.get("raw_content", "").strip())
             lines.append(f"- **{title}**\n {url}\n {content}")
 
         return "\n".join(lines)
@@ -69,6 +73,34 @@ async def tavily_extract(url: str) -> str:
     except Exception as e:
         logger.exception("Tavily extract failed")
         return f"Error performing Tavily extract: {e}"
+
+
+def sanitize_markdown(content: str) -> str:
+    if not content:
+        return ""
+
+    try:
+        content = re.sub(r"[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]", "", content)
+        content = bleach.clean(
+            content,
+            tags=[],
+            attributes={},
+            strip=True,
+            strip_comments=True,
+        )
+
+        def validate_md_link(match: Match) -> str:
+            text, url = match.groups()
+            if url.startswith("https://"):
+                return f"[{text}]({url})"
+            else:
+                return text
+
+        content = re.sub(r"\[([^\]]+)\]\(([^\)]+)\)", validate_md_link, content)
+        return content.strip()
+
+    except Exception as e:
+        return "Error sanitizing markdown"
 
 
 def validate_url(url: str) -> tuple[bool, str]:

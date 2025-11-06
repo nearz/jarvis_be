@@ -18,15 +18,15 @@ class ModelException(Exception):
 
 @lru_cache(maxsize=8)
 def get_model(input_model: str) -> Union[BaseChatModel, Runnable]:
-    model = supported_models.get(input_model, None)
+    model_config = supported_models.get(input_model, None)
 
-    if model is None:
+    if model_config is None:
         raise ValueError(f"Unsupported llm: {input_model}")
 
     try:
-        model_str = f"{model['provider_string']}:{model['model_string']}"
+        model_str = f"{model_config.provider}:{model_config.model}"
         init_model = init_chat_model(model_str)
-        if model["tool_support"]:
+        if model_config.tool_support:
             return init_model.bind_tools(get_tools())
         return init_model
     except Exception as e:
