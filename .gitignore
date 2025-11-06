@@ -1,5 +1,6 @@
 # DEV
 checkpoints.db
+checkpoints.*
 todo.md
 todo_temp.md
 user.md
