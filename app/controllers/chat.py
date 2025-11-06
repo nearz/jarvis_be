@@ -17,6 +17,7 @@ from langgraph.graph.state import CompiledStateGraph, RunnableConfig
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from ..agent.state import AgentState, ContextSchema
+from ..agent.model import ModelException
 from ..core.llm_utils.title_generator import generate_chat_title
 from ..core.llm_utils.normalize import get_msg_content_text
 from ..core.db_ops.app_db import AppDatabase, DatabaseException, MessageType
@@ -89,6 +90,10 @@ async def chat_controller(
     except ValueError as e:
         logger.exception("Configuration error | thread_id: %s", thread_id)
         yield ErrorStreamChunk(message="Configuration error")
+
+    except ModelException as e:
+        logger.exception("Error initializing llm model | thread_id: %s", thread_id)
+        yield ErrorStreamChunk(message="LLM model initialization error")
 
     except TimeoutError as e:
         logger.exception("Timeout error | thread_id: %s", thread_id)

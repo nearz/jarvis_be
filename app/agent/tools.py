@@ -8,10 +8,6 @@ logger = get_logger(__name__)
 
 _TOOLS_REGISTRY = []
 
-TAVILY_MAX_RESULTS = 5
-TAVILY_SEARCH_TIMEOUT = 15
-TAVILY_EXTRACT_TIMEOUT = 15.0
-
 
 def register_tool(func):
     decorated = tool(func)
@@ -20,16 +16,19 @@ def register_tool(func):
 
 
 @register_tool
-async def tavily_extract(urls: list[str]) -> str:
+async def tavily_extract(url: str) -> str:
     """
-    Extract web page content from one or more specified URLs
+    Extract web page content from the specified URL
 
     Args:
-        urls: list of urls to extract content from
+        url: the URL to extract content from
 
     Returns:
         A formatted string containing extraction results
     """
+    if not url:
+        return "Error: No URL provided for extraction"
+
     try:
         client = get_async_tavily_client()
     except MissingApiKey as e:
@@ -38,7 +37,7 @@ async def tavily_extract(urls: list[str]) -> str:
 
     try:
         resp = await client.extract(
-            urls=urls,
+            urls=[url],
             include_images=False,
             extract_depth="advanced",
             format="markdown",
