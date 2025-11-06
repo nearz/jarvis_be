@@ -25,9 +25,6 @@ class ContextSchema:
     llm: str
 
 
-# TODO: What if exception is raised inside a node?
-
-
 async def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
     logger.debug("LLM call started | llm: %s", runtime.context.llm)
 
@@ -53,6 +50,8 @@ def should_continue(state: AgentState) -> bool:
 
     if has_tool_calls:
         logger.debug("Tool calls detected | tool calls: %s", last_msg.tool_calls)
+    else:
+        logger.debug("No tool calls detected")
 
     return has_tool_calls
 

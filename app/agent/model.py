@@ -1,4 +1,5 @@
 from typing import Union
+from functools import lru_cache
 from langchain_openai import ChatOpenAI
 from langgraph.graph.state import Runnable
 from langchain_core.language_models import BaseChatModel
@@ -8,8 +9,7 @@ from .supported_models import supported_models
 from .tools import get_tools
 
 
-# TODO: bind_tools returns Runnable, what does model return?
-# TODO: Raise exceptions when model not supported?
+@lru_cache(maxsize=8)
 def get_model(input_model: str) -> Union[BaseChatModel, Runnable]:
     model = supported_models.get(input_model, None)
 

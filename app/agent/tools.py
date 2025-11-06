@@ -2,6 +2,7 @@ from langchain_core.tools import tool, BaseTool
 
 from .tavily_client import get_async_tavily_client, MissingApiKey
 from ..core.logging import get_logger
+from ..core.config import settings
 
 logger = get_logger(__name__)
 
@@ -41,7 +42,7 @@ async def tavily_extract(urls: list[str]) -> str:
             include_images=False,
             extract_depth="advanced",
             format="markdown",
-            timeout=TAVILY_EXTRACT_TIMEOUT,
+            timeout=settings.TAVILY_EXTRACT_TIMEOUT,
         )
 
         results = (resp or {}).get("results", [])
@@ -62,7 +63,7 @@ async def tavily_extract(urls: list[str]) -> str:
 
     except Exception as e:
         logger.exception("Tavily extract failed")
-        return f"Error performing Tavily search: {e}"
+        return f"Error performing Tavily extract: {e}"
 
 
 @register_tool
@@ -86,8 +87,8 @@ async def tavily_search(query: str) -> str:
         resp = await client.search(
             query,
             search_depth="advanced",
-            max_results=TAVILY_MAX_RESULTS,
-            timeout=TAVILY_SEARCH_TIMEOUT,
+            max_results=settings.TAVILY_MAX_RESULTS,
+            timeout=settings.TAVILY_SEARCH_TIMEOUT,
         )
 
         results = (resp or {}).get("results", [])
