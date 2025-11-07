@@ -1,13 +1,9 @@
-from urllib.parse import urlparse
-import re
-from re import Match
-
 from langchain_core.tools import tool, BaseTool
-import bleach
 
 from .tavily_client import get_async_tavily_client, MissingApiKey
 from ..core.logging import get_logger
 from ..core.config import settings
+from ..core.utils.web_extract import should_extract, sanitize_markdown
 
 logger = get_logger(__name__)
 
@@ -34,7 +30,7 @@ async def tavily_extract(url: str) -> str:
     if not url:
         return "Error: No URL provided for extraction"
 
-    is_valid, err_msg = validate_url(url)
+    is_valid, err_msg = should_extract(url)
     if not is_valid:
         logger.warning("Invalid URL for extraction | url: %s | error: %s", url, err_msg)
         return f"Error: {err_msg}"
@@ -73,56 +69,6 @@ async def tavily_extract(url: str) -> str:
     except Exception as e:
         logger.exception("Tavily extract failed")
         return f"Error performing Tavily extract: {e}"
-
-
-def sanitize_markdown(content: str) -> str:
-    if not content:
-        return ""
-
-    try:
-        content = re.sub(r"[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]", "", content)
-        content = bleach.clean(
-            content,
-            tags=[],
-            attributes={},
-            strip=True,
-            strip_comments=True,
-        )
-
-        def validate_md_link(match: Match) -> str:
-            text, url = match.groups()
-            if url.startswith("https://"):
-                return f"[{text}]({url})"
-            else:
-                return text
-
-        content = re.sub(r"\[([^\]]+)\]\(([^\)]+)\)", validate_md_link, content)
-        return content.strip()
-
-    except Exception as e:
-        return "Error sanitizing markdown"
-
-
-def validate_url(url: str) -> tuple[bool, str]:
-    if not url or not isinstance(url, str):
-        return False, "No URL provided"
-
-    if len(url) > 2048:
-        return False, "URL exceeds max length (2048 characters)"
-
-    try:
-        parsed = urlparse(url)
-
-        if not parsed.scheme or not parsed.netloc:
-            return False, "Invalid URL format (must include protocol and domain)"
-
-        if parsed.scheme != "https":
-            return False, f"Unsupported protocol '{parsed.scheme}' (only https allowed)"
-
-        return True, ""
-
-    except Exception as e:
-        return False, "Malformed URL"
 
 
 @register_tool
