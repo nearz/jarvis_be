@@ -1,4 +1,5 @@
 import re
+import requests
 from re import Match
 from urllib.parse import urlparse
 
@@ -55,10 +56,41 @@ def validate_url(url: str) -> tuple[bool, str]:
         return False, "Malformed URL"
 
 
+async def is_url_accesible(url: str) -> tuple[bool, str]:
+    try:
+        resp = requests.head(url, allow_redirects=True, timeout=5)
+
+        if resp.status_code not in (200, 203, 204):
+            return (
+                False,
+                f"Head response not either 200, 203, 204. status code: {resp.status_code}",
+            )
+
+        ctype = resp.headers.get("content-type", "")
+        if not ctype.startswith("text/html"):
+            return False, f"Content type not acceptable. content-type: {ctype}"
+
+        if resp.history:
+            orig = urlparse(url).netloc
+            for hop in resp.history:
+                loc = hop.headers.get("Location", "")
+                if loc and urlparse(loc).netloc not in ("", orig):
+                    return False, "Domain changed between redirects"
+
+        return True, ""
+    except requests.RequestException:
+        return False, "Head request failed."
+
+
 # TODO: What else can I add to this pipeline for safe URL checks
-# NOTE: If calling external APIs like google safe search make async
-def should_extract(url: str) -> tuple[bool, str]:
+# TODO: Look at Google Safe Search
+async def should_extract(url: str) -> tuple[bool, str]:
     if not (result := validate_url(url))[0]:
         ok, err_msg = result
         return ok, err_msg
+
+    if not (result := await is_url_accesible(url))[0]:
+        ok, err_msg = result
+        return ok, err_msg
+
     return True, ""

@@ -30,7 +30,7 @@ async def tavily_extract(url: str) -> str:
     if not url:
         return "Error: No URL provided for extraction"
 
-    is_valid, err_msg = should_extract(url)
+    is_valid, err_msg = await should_extract(url)
     if not is_valid:
         logger.warning("Invalid URL for extraction | url: %s | error: %s", url, err_msg)
         return f"Error: {err_msg}"
