@@ -8,6 +8,10 @@ from .controller_models import (
     ContentStreamChunk,
     DoneStreamChunk,
     ErrorStreamChunk,
+    ProjectResult,
+    CreateProjectResult,
+    ProjectsResult,
+    InstructionsResult,
 )
 
 __all__ = [
@@ -20,4 +24,8 @@ __all__ = [
     "ContentStreamChunk",
     "DoneStreamChunk",
     "ErrorStreamChunk",
+    "ProjectResult",
+    "CreateProjectResult",
+    "ProjectsResult",
+    "InstructionsResult",
 ]

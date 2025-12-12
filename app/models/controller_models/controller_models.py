@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Optional
 from ..token import Token
 from ..thread import Thread, ThreadMessage
+from ..project import Project
 
 
 class ErrorType(Enum):
@@ -40,6 +41,27 @@ class ThreadMessagesResult(BaseResult):
 
 @dataclass
 class ThreadDeleteResult(BaseResult):
+    pass
+
+
+@dataclass
+class CreateProjectResult(BaseResult):
+    project_id: Optional[str] = None
+
+
+@dataclass
+class ProjectResult(BaseResult):
+    instructions: Optional[str] = None
+    threads: Optional[list[Thread]] = None
+
+
+@dataclass
+class ProjectsResult(BaseResult):
+    projects: Optional[list[Project]] = None
+
+
+@dataclass
+class InstructionsResult(BaseResult):
     pass
 
 

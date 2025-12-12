@@ -203,6 +203,7 @@ class AppDatabase:
         project_id: Optional[str] = None,
     ) -> None:
         try:
+            # Transaction handled externally for commit.
             await self.conn.execute(
                 """INSERT INTO user_threads (user_id, thread_id, title, last_llm_used, project_id)
                     VALUES(?, ?, ?, ?, ?)
@@ -275,6 +276,7 @@ class AppDatabase:
         self, user_id: str, thread_id: str, last_llm_used: str
     ) -> None:
         try:
+            # Transaction handled externally for commit.
             await self.conn.execute(
                 """UPDATE user_threads SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), last_llm_used = ?
                     WHERE user_id = ? AND thread_id = ?""",
@@ -379,6 +381,7 @@ class AppDatabase:
         self, content: str, msg_type: str, llm: str, msg_id: str, thread_id: str
     ) -> None:
         try:
+            # Transaction handled externally for commit.
             await self.conn.execute(
                 """INSERT INTO thread_messages 
                    (content, message_type, llm, message_index, message_id, thread_id)
@@ -517,12 +520,12 @@ class AppDatabase:
         self, project_id: str, user_id: str, title: str, instructions: str = ""
     ) -> None:
         try:
-            await self.conn.execute(
-                """INSERT INTO projects (id, user_id, title, instructions)
-                VALUES (?, ?, ?, ?)""",
-                (project_id, user_id, title, instructions),
-            )
-            return
+            async with self.transaction():
+                await self.conn.execute(
+                    """INSERT INTO projects (id, user_id, title, instructions)
+                    VALUES (?, ?, ?, ?)""",
+                    (project_id, user_id, title, instructions),
+                )
         except aiosqlite.IntegrityError as e:
             logger.warning(
                 "Create project failed - integrity constraint | user_id: %s | project_id: %s | error: %s",
@@ -651,6 +654,7 @@ class AppDatabase:
         title: Optional[str] = None,
         instructions: Optional[str] = None,
     ) -> None:
+        # NEED Transaction
         try:
             updates = []
             params = []
@@ -671,8 +675,8 @@ class AppDatabase:
             params.append(project_id)
             query = f"UPDATE projects SET {', '.join(updates)} WHERE id = ?"
 
-            await self.conn.execute(query, tuple(params))
-            return
+            async with self.transaction():
+                await self.conn.execute(query, tuple(params))
         except aiosqlite.IntegrityError as e:
             logger.warning(
                 "Update project failed - integrity constraint | project_id: %s",
@@ -792,12 +796,12 @@ class AppDatabase:
 
     async def set_project_updated(self, project_id: str) -> None:
         try:
-            await self.conn.execute(
-                """UPDATE projects SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-                WHERE id = ?""",
-                (project_id,),
-            )
-            return
+            async with self.transaction():
+                await self.conn.execute(
+                    """UPDATE projects SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                    WHERE id = ?""",
+                    (project_id,),
+                )
         except aiosqlite.IntegrityError as e:
             logger.warning(
                 "Set project updated_at failed - integrity constraint | project_id: %s",
