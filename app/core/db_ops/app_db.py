@@ -195,14 +195,19 @@ class AppDatabase:
             return False
 
     async def create_user_thread(
-        self, user_id: str, thread_id: str, title: str, last_llm_used: str
+        self,
+        user_id: str,
+        thread_id: str,
+        title: str,
+        last_llm_used: str,
+        project_id: Optional[str] = None,
     ) -> None:
         try:
             await self.conn.execute(
-                """INSERT INTO user_threads (user_id, thread_id, title, last_llm_used)
-                    VALUES(?, ?, ?, ?)
+                """INSERT INTO user_threads (user_id, thread_id, title, last_llm_used, project_id)
+                    VALUES(?, ?, ?, ?, ?)
                     ON CONFLICT(thread_id) DO NOTHING""",
-                (user_id, thread_id, title, last_llm_used),
+                (user_id, thread_id, title, last_llm_used, project_id),
             )
             return
         except aiosqlite.IntegrityError as e:
@@ -526,6 +531,20 @@ async def init_app_db(conn: aiosqlite.Connection):
 
     await conn.execute(
         """
+        CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        instructions TEXT,
+        updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), 
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+
+    await conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS user_threads (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT NOT NULL,
@@ -534,7 +553,9 @@ async def init_app_db(conn: aiosqlite.Connection):
         last_llm_used TEXT,
         updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')), 
-        FOREIGN KEY (user_id) REFERENCES users(id) on DELETE CASCADE
+        project_id TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) on DELETE CASCADE,
+        FOREIGN KEY (project_id) REFERENCES projects(id) on DELETE CASCADE
         )
         """
     )
@@ -557,13 +578,26 @@ async def init_app_db(conn: aiosqlite.Connection):
         """
     )
 
+    # Users
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_email ON users(email)")
+
+    # Projects
     await conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_user_threads_user_id ON user_threads(user_id)"
+        "CREATE INDEX IF NOT EXISTS idx_projects_user_updated ON projects(user_id, updated_at DESC)"
+    )
+
+    # User Threads
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_threads_user_updated ON user_threads(user_id, updated_at DESC)"
     )
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_user_threads_thread_id ON user_threads(thread_id)"
     )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_threads_project_updated ON user_threads(project_id, updated_at DESC)"
+    )
+
+    # Thread Messages
     await conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_thread_messages_thread_id ON thread_messages(thread_id)"
     )
