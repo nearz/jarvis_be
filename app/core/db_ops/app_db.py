@@ -513,6 +513,318 @@ class AppDatabase:
             )
             raise DatabaseException(f"Unexpected database error: {e}") from e
 
+    async def create_project(
+        self, project_id: str, user_id: str, title: str, instructions: str = ""
+    ) -> None:
+        try:
+            await self.conn.execute(
+                """INSERT INTO projects (id, user_id, title, instructions)
+                VALUES (?, ?, ?, ?)""",
+                (project_id, user_id, title, instructions),
+            )
+            return
+        except aiosqlite.IntegrityError as e:
+            logger.warning(
+                "Create project failed - integrity constraint | user_id: %s | project_id: %s | error: %s",
+                user_id,
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database integrity error: {e}") from e
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Create project failed - operational error | user_id: %s | project_id: %s | error: %s",
+                user_id,
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Create project failed - database error | user_id: %s | project_id: %s | error: %s",
+                user_id,
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Create project failed - unexpected error | user_id: %s | project_id: %s",
+                user_id,
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def get_user_projects(self, user_id: str) -> Optional[list[dict[str, Any]]]:
+        try:
+            async with self.conn.execute(
+                """SELECT * FROM projects WHERE user_id = ?
+                ORDER BY updated_at DESC, created_at DESC""",
+                (user_id,),
+            ) as cursor:
+                res = await cursor.fetchall()
+                return [dict(row) for row in res] if res else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get user projects failed - operational error | user_id: %s | error: %s",
+                user_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get user projects failed - database error | user_id: %s | error: %s",
+                user_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get user projects failed - unexpected error | user_id: %s", user_id
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def get_project_by_id(self, project_id: str) -> Optional[dict[str, Any]]:
+        try:
+            async with self.conn.execute(
+                "SELECT * FROM projects WHERE id = ?", (project_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get project by id failed - operational error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get project by id failed - database error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get project by id failed - unexpected error | project_id: %s",
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def verify_project_ownership(self, user_id: str, project_id: str) -> bool:
+        try:
+            async with self.conn.execute(
+                """SELECT 1 FROM projects
+                WHERE user_id = ? AND id = ?""",
+                (user_id, project_id),
+            ) as cursor:
+                res = await cursor.fetchone()
+                return res is not None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Verify project ownership failed - operational error | user_id: %s | project_id: %s | error: %s",
+                user_id,
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Verify project ownership failed - database error | user_id: %s | project_id: %s | error: %s",
+                user_id,
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Verify project ownership failed - unexpected error | user_id: %s | project_id: %s",
+                user_id,
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def update_project(
+        self,
+        project_id: str,
+        title: Optional[str] = None,
+        instructions: Optional[str] = None,
+    ) -> None:
+        try:
+            updates = []
+            params = []
+
+            if title is not None:
+                updates.append("title = ?")
+                params.append(title)
+
+            if instructions is not None:
+                updates.append("instructions = ?")
+                params.append(instructions)
+
+            updates.append("updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))")
+
+            if not updates:
+                return
+
+            params.append(project_id)
+            query = f"UPDATE projects SET {', '.join(updates)} WHERE id = ?"
+
+            await self.conn.execute(query, tuple(params))
+            return
+        except aiosqlite.IntegrityError as e:
+            logger.warning(
+                "Update project failed - integrity constraint | project_id: %s",
+                project_id,
+            )
+            raise DatabaseException(f"Database integrity error: {e}") from e
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Update project failed - operational error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Update project failed - database error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Update project failed - unexpected error | project_id: %s",
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def delete_project(self, project_id: str, user_id: str) -> None:
+        try:
+            async with self.transaction():
+                await self.conn.execute(
+                    "DELETE FROM projects WHERE id = ? AND user_id = ?",
+                    (project_id, user_id),
+                )
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Delete project failed - operational error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Delete project failed - database error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Delete project failed - unexpected error | project_id: %s",
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def project_exists(self, project_id: str) -> bool:
+        try:
+            async with self.conn.execute(
+                """SELECT 1 FROM projects
+                WHERE id = ?""",
+                (project_id,),
+            ) as cursor:
+                res = await cursor.fetchone()
+                return res is not None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Project exists check failed - operational error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Project exists check failed - database error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Project exists check failed - unexpected error | project_id: %s",
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def get_project_threads(
+        self, project_id: str
+    ) -> Optional[list[dict[str, Any]]]:
+        try:
+            async with self.conn.execute(
+                """SELECT * FROM user_threads WHERE project_id = ?
+                ORDER BY updated_at DESC, created_at DESC""",
+                (project_id,),
+            ) as cursor:
+                res = await cursor.fetchall()
+                return [dict(row) for row in res] if res else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get project threads failed - operational error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get project threads failed - database error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get project threads failed - unexpected error | project_id: %s",
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def set_project_updated(self, project_id: str) -> None:
+        try:
+            await self.conn.execute(
+                """UPDATE projects SET updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+                WHERE id = ?""",
+                (project_id,),
+            )
+            return
+        except aiosqlite.IntegrityError as e:
+            logger.warning(
+                "Set project updated_at failed - integrity constraint | project_id: %s",
+                project_id,
+            )
+            raise DatabaseException(f"Database integrity error: {e}") from e
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Set project updated_at failed - operational error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Set project updated_at failed - database error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Set project updated_at failed - unexpected error | project_id: %s",
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
 
 async def init_app_db(conn: aiosqlite.Connection):
     await conn.execute("PRAGMA foreign_keys = ON")
