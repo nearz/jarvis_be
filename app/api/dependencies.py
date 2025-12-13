@@ -136,3 +136,59 @@ async def thread_validation(
 
     logger.info("Thread validated | thread_id: %s | user_id: %s", thread_id, user.id)
     return thread_id
+
+
+async def project_validation(
+    project_id: str,
+    app_db: AppDatabase = Depends(get_app_db),
+    user=Depends(get_current_user),
+) -> str:
+    project_id = project_id.strip()
+    logger.info("Validating project | project_id: %s | user_id: %s", project_id, user.id)
+    try:
+        UUID(project_id)
+        project_does_exist = await app_db.project_exists(project_id)
+        project_owned = await app_db.verify_project_ownership(user.id, project_id)
+
+    except ValueError:
+        logger.warning(
+            "Invalid project_id format | project_id: %s | user_id: %s", project_id, user.id
+        )
+        raise HTTPException(status_code=400, detail="Invalid project_id format")
+
+    except DatabaseException as e:
+        logger.error("Database exception occurred | error: %s", str(e))
+        raise HTTPException(
+            status_code=503,
+            detail="Database temporarily unavailable",
+        )
+
+    except Exception as e:
+        logger.exception(
+            "Exception occurred while validating project | project_id: %s | error: %s",
+            project_id,
+            str(e),
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unexpected system error",
+        )
+
+    if not project_does_exist:
+        logger.warning(
+            "Project does not exist | project_id: %s | user_id: %s",
+            project_id,
+            user.id,
+        )
+        raise HTTPException(status_code=404, detail="Project does not exist")
+
+    if not project_owned:
+        logger.warning(
+            "Project is not owned by user | project_id: %s | user_id: %s",
+            project_id,
+            user.id,
+        )
+        raise HTTPException(status_code=403, detail="User cannot access project")
+
+    logger.info("Project validated | project_id: %s | user_id: %s", project_id, user.id)
+    return project_id

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from .dependencies import get_current_user, get_app_db
+from .dependencies import get_current_user, get_app_db, project_validation
 from ..controllers.projects import (
     create_project_controller,
     get_projects_controller,
@@ -33,7 +33,6 @@ async def get_projects(
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
 ):
-    # NOTE: Need a project_validation dependency similar to thread_validation
     logger.info("Get projects request | user_id: %s", user.id)
     result = await get_projects_controller(user.id, app_db)
 
@@ -69,9 +68,9 @@ async def create_project(
 
 
 @router.post("/projects/{project_id}")
-async def update_instructions(
+async def update_project(
     req: UpdateProjectRequest,
-    project_id: str,
+    project_id: str = Depends(project_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
 ):
@@ -109,7 +108,7 @@ async def update_instructions(
 
 @router.get("/projects/{project_id}")
 async def get_project(
-    project_id: str,
+    project_id: str = Depends(project_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
 ):
@@ -158,3 +157,13 @@ async def get_project(
     else:
         project_resp.threads = result.threads
         return project_resp
+
+
+@router.post("/projects/{project_id}/chat")
+async def project_new_chat():
+    pass
+
+
+@router.post("/projects/{project_id}/chat/{thead_id}")
+async def project_chat():
+    pass
