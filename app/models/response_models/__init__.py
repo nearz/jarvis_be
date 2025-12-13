@@ -4,7 +4,7 @@ from .projects import (
     ProjectResponse,
     ProjectsResponse,
     CreateProjectResponse,
-    InstructionsResponse,
+    UpdateProjectResponse,
 )
 
 __all__ = [
@@ -16,5 +16,5 @@ __all__ = [
     "CreateProjectResponse",
     "ProjectResponse",
     "ProjectsResponse",
-    "InstructionsResponse",
+    "UpdateProjectResponse",
 ]

@@ -1,10 +1,13 @@
 from uuid import uuid4
+from typing import Optional
 
 from ..models.project import Project
+from ..models.thread import Thread
 from ..models.controller_models import (
     CreateProjectResult,
     ProjectResult,
     ProjectsResult,
+    UpdateProjectResult,
     ErrorType,
 )
 from ..core.db_ops.app_db import AppDatabase, DatabaseException
@@ -82,13 +85,82 @@ async def get_projects_controller(user_id: str, app_db: AppDatabase) -> Projects
         )
 
 
-# async def get_project_controller(project_id: str, app_db: AppDatabase) -> ProjectResult:
-#     pass
+async def get_project_controller(project_id: str, app_db: AppDatabase) -> ProjectResult:
+    try:
+        project_db = await app_db.get_project_by_id(project_id)
+        project_threads_db = await app_db.get_project_threads(project_id)
+
+        if project_db is None:
+            # TODO: Handle error better
+            return ProjectResult(success=False)
+
+        project_res = ProjectResult(
+            success=True,
+            project_id=project_db["id"],
+            title=project_db["title"],
+            instructions=project_db["instructions"],
+            created_at=project_db["created_at"],
+            updated_at=project_db["updated_at"],
+        )
+
+        if project_threads_db is None:
+            return project_res
+
+        threads = [
+            Thread(
+                title=t["title"],
+                thread_id=t["thread_id"],
+                last_llm_used=t["last_llm_used"],
+                created_at=t["created_at"],
+                updated_at=t["updated_at"],
+            )
+            for t in project_threads_db
+        ]
+        project_res.threads = threads
+
+        return project_res
+
+    except DatabaseException as e:
+        logger.exception("Database exception occurred | project_id: %s", project_id)
+        return ProjectResult(
+            success=False,
+            error_type=ErrorType.DATABASE_ERROR,
+            error_details="Database exception occurred",
+        )
+
+    except Exception as e:
+        logger.exception("System error")
+        return ProjectResult(
+            success=False,
+            error_type=ErrorType.SYSTEM_ERROR,
+            error_details="Unexpected system failure",
+        )
 
 
-# async def instructions_project_controller(
-#     project_id: str, inst: str, user_id: str, app_db: AppDatabase
-# ) -> InstructionsResponse:
-#     pass
-#
-#
+async def update_project_controller(
+    project_id: str,
+    user_id: str,
+    app_db: AppDatabase,
+    title: Optional[str] = None,
+    inst: Optional[str] = None,
+) -> UpdateProjectResult:
+
+    try:
+        await app_db.update_project(project_id, title=title, instructions=inst)
+        return UpdateProjectResult(success=True)
+
+    except DatabaseException as e:
+        logger.exception("Database exception occurred | user_id: %s", user_id)
+        return UpdateProjectResult(
+            success=False,
+            error_type=ErrorType.DATABASE_ERROR,
+            error_details="Database exception occurred",
+        )
+
+    except Exception as e:
+        logger.exception("System error")
+        return UpdateProjectResult(
+            success=False,
+            error_type=ErrorType.SYSTEM_ERROR,
+            error_details="Unexpected system failure",
+        )

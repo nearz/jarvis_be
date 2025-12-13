@@ -11,7 +11,7 @@ from .controller_models import (
     ProjectResult,
     CreateProjectResult,
     ProjectsResult,
-    InstructionsResult,
+    UpdateProjectResult,
 )
 
 __all__ = [
@@ -27,5 +27,5 @@ __all__ = [
     "ProjectResult",
     "CreateProjectResult",
     "ProjectsResult",
-    "InstructionsResult",
+    "UpdateProjectResult",
 ]

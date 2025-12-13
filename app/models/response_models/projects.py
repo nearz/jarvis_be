@@ -1,4 +1,7 @@
 from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+
 from ..thread import Thread
 from ..project import Project
 
@@ -10,8 +13,11 @@ class CreateProjectResponse(BaseModel):
 
 class ProjectResponse(BaseModel):
     success: bool = True
+    title: str
     instructions: str
-    threads: list[Thread]
+    created_at: datetime
+    updated_at: datetime
+    threads: Optional[list[Thread]] = []
 
 
 class ProjectsResponse(BaseModel):
@@ -19,5 +25,6 @@ class ProjectsResponse(BaseModel):
     projects: list[Project]
 
 
-class InstructionsResponse(BaseModel):
+class UpdateProjectResponse(BaseModel):
     success: bool = True
+    project_id: str

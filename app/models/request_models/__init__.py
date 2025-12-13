@@ -1,5 +1,5 @@
 from .chat_request import ChatRequest
-from .project_requests import ProjectRequest, InstructionRequest
+from .project_requests import ProjectRequest, UpdateProjectRequest
 from .auth import LoginRequest, RegisterRequest
 
 __all__ = [
@@ -7,5 +7,5 @@ __all__ = [
     "LoginRequest",
     "RegisterRequest",
     "ProjectRequest",
-    "InstructionRequest",
+    "UpdateProjectRequest",
 ]

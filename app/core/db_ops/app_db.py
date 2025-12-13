@@ -654,7 +654,6 @@ class AppDatabase:
         title: Optional[str] = None,
         instructions: Optional[str] = None,
     ) -> None:
-        # NEED Transaction
         try:
             updates = []
             params = []

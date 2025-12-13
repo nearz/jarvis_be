@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+from datetime import datetime
+
 from ..token import Token
 from ..thread import Thread, ThreadMessage
 from ..project import Project
@@ -51,7 +53,11 @@ class CreateProjectResult(BaseResult):
 
 @dataclass
 class ProjectResult(BaseResult):
+    project_id: Optional[str] = None
+    title: Optional[str] = None
     instructions: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     threads: Optional[list[Thread]] = None
 
 
@@ -61,7 +67,7 @@ class ProjectsResult(BaseResult):
 
 
 @dataclass
-class InstructionsResult(BaseResult):
+class UpdateProjectResult(BaseResult):
     pass
 
 

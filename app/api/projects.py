@@ -1,18 +1,24 @@
-from fastapi import APIRouter, Depends
-
+from fastapi import APIRouter, Depends, HTTPException
 
 from .dependencies import get_current_user, get_app_db
 from ..controllers.projects import (
     create_project_controller,
     get_projects_controller,
+    update_project_controller,
+    get_project_controller,
 )
 from ..models import User
 from ..models.request_models import (
     ProjectRequest,
     ChatRequest,
-    InstructionRequest,
+    UpdateProjectRequest,
 )
-from ..models.response_models import CreateProjectResponse, ProjectsResponse
+from ..models.response_models import (
+    CreateProjectResponse,
+    ProjectsResponse,
+    UpdateProjectResponse,
+    ProjectResponse,
+)
 from ..core.db_ops.app_db import AppDatabase
 from ..core.logging import get_logger
 from .errors import create_error_response
@@ -42,12 +48,6 @@ async def get_projects(
         logger.info("No project history | user_id: %s", user.id)
         return ProjectsResponse(projects=[])
 
-    """
-    Returns:
-    Projects - list of projects
-    """
-    pass
-
 
 @router.post("/projects")
 async def create_project(
@@ -68,13 +68,38 @@ async def create_project(
     return CreateProjectResponse(project_id=result.project_id)
 
 
-@router.post("/projects/{project_id}/instructions")
+@router.post("/projects/{project_id}")
 async def update_instructions(
-    req: InstructionRequest,
+    req: UpdateProjectRequest,
+    project_id: str,
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
 ):
     # NOTE: Need a project_validation dependency similar to thread_validation
+    logger.info(
+        "Update project instructions request | user_id: %s | project_id: %s",
+        user.id,
+        project_id,
+    )
+    result = await update_project_controller(
+        project_id, user.id, app_db, req.title, req.instructions
+    )
+
+    if not result.success:
+        logger.warning(
+            "Project creation failure | user_id: %s | project_id: %s",
+            user.id,
+            project_id,
+        )
+        return create_error_response(result)
+
+    logger.info(
+        "Project successfully updated | user_id: %s | project_id: %s",
+        user.id,
+        project_id,
+    )
+    return UpdateProjectResponse(project_id=project_id)
+
     """
     Returns:
     Boolean? - updated succesfully
@@ -84,41 +109,52 @@ async def update_instructions(
 
 @router.get("/projects/{project_id}")
 async def get_project(
+    project_id: str,
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
 ):
     # NOTE: Need a project_validation dependency similar to thread_validation
-    """
-    Returns:
-    Project ID
-    Project Instructions
-    List of Threads
-    """
-    pass
+    logger.info(
+        "Get project request | user_id: %s | project_id: %s",
+        user.id,
+        project_id,
+    )
+    result = await get_project_controller(project_id, app_db)
 
+    if not result.success:
+        logger.warning(
+            "Get project failure | user_id: %s | project_id: %s",
+            user.id,
+            project_id,
+        )
+        return create_error_response(result)
 
-# NOTE: I think the below will not be endpoints. Thread requests
-# Will still go through chat endpoint, just with a project_id
-# if thread is part of a project.
-# @router.get("/projects/{project_id}/threads")
-# async def new_project_thread(
-#     req: ChatRequest,
-#     user: User = Depends(get_current_user),
-#     app_db: AppDatabase = Depends(get_app_db),
-# ):
-#     """
-#     ChatRequest - for new thread under project
-#     """
-#     pass
-#
-#
-# @router.post("/projects/{project_id}/threads/{thread_id}")
-# async def project_thread(
-#     req: ChatRequest,
-#     user: User = Depends(get_current_user),
-#     app_db: AppDatabase = Depends(get_app_db),
-# ):
-#     """
-#     ChatRequest - for message to existing thread
-#     """
-#     pass
+    logger.info(
+        "Get project success | user_id: %s | project_id: %s",
+        user.id,
+        project_id,
+    )
+
+    if any(
+        p is None
+        for p in (
+            result.title,
+            result.instructions,
+            result.created_at,
+            result.updated_at,
+        )
+    ):
+        raise HTTPException(status_code=500, detail="Unexpected missing messages")
+
+    project_resp = ProjectResponse(
+        title=result.title,
+        instructions=result.instructions,
+        created_at=result.created_at,
+        updated_at=result.updated_at,
+    )
+    if result.threads is None:
+        project_resp.threads = []
+        return project_resp
+    else:
+        project_resp.threads = result.threads
+        return project_resp
