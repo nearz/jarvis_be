@@ -85,7 +85,9 @@ async def get_projects_controller(user_id: str, app_db: AppDatabase) -> Projects
         )
 
 
-async def get_project_controller(project_id: str, app_db: AppDatabase) -> ProjectResult:
+async def get_project_controller(
+    project_id: str, app_db: AppDatabase, include_threads: bool
+) -> ProjectResult:
     try:
         project_db = await app_db.get_project_by_id(project_id)
         project_threads_db = await app_db.get_project_threads(project_id)
@@ -103,7 +105,7 @@ async def get_project_controller(project_id: str, app_db: AppDatabase) -> Projec
             updated_at=project_db["updated_at"],
         )
 
-        if project_threads_db is None:
+        if project_threads_db is None or not include_threads:
             return project_res
 
         threads = [

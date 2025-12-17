@@ -122,6 +122,7 @@ async def update_project(
 
 @router.get("/projects/{project_id}")
 async def get_project(
+    include_threads: bool | None = None,
     project_id: str = Depends(project_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
@@ -131,7 +132,10 @@ async def get_project(
         user.id,
         project_id,
     )
-    result = await get_project_controller(project_id, app_db)
+
+    include_threads = True if include_threads is None else include_threads
+
+    result = await get_project_controller(project_id, app_db, include_threads)
 
     if not result.success:
         logger.warning(
