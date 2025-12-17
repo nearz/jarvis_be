@@ -46,10 +46,11 @@ async def chat_controller(
     graph: CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState],
     *,
     thread_id: Union[str, None],
+    project_id: Union[str, None],
 ):
     new_thread = False
     if not thread_id:
-        thread_id = str(uuid4())
+        thread_id = "t-" + str(uuid4())
         new_thread = True
         logger.info("New thread created | thread_id: %s", thread_id)
 
@@ -60,8 +61,13 @@ async def chat_controller(
             thread_id,
             message[:100],
         )
+
+        proj_instructions = None
+        if project_id is not None:
+            proj_instructions = await app_db.get_project_instructions(project_id)
+
         config = RunnableConfig({"configurable": {"thread_id": thread_id}})
-        context = ContextSchema(llm)
+        context = ContextSchema(llm, proj_instructions)
 
         async for msg, _ in graph.astream(
             {"messages": [human_msg]},
@@ -83,7 +89,13 @@ async def chat_controller(
 
         asyncio.create_task(
             _thread_persistence_with_fallback(
-                thread_id, user_id, llm, new_thread, app_db, saver
+                thread_id,
+                user_id,
+                llm,
+                new_thread,
+                app_db,
+                saver,
+                project_id=project_id,
             )
         )
 
@@ -115,10 +127,20 @@ async def _thread_persistence_with_fallback(
     new_thread: bool,
     app_db: AppDatabase,
     saver: AsyncSqliteSaver,
+    *,
+    project_id: Union[str, None],
 ):
     try:
         await asyncio.wait_for(
-            _thread_persistence(thread_id, user_id, llm, new_thread, app_db, saver),
+            _thread_persistence(
+                thread_id,
+                user_id,
+                llm,
+                new_thread,
+                app_db,
+                saver,
+                project_id=project_id,
+            ),
             timeout=60.0,
         )
         logger.info("Thread persisted successfully | thread_id: %s", thread_id)
@@ -219,6 +241,8 @@ async def _thread_persistence(
     new_thread: bool,
     app_db: AppDatabase,
     saver: AsyncSqliteSaver,
+    *,
+    project_id: Union[str, None],
 ) -> None:
 
     logger.debug("Start thread persistence | thread_id: %s", thread_id)
@@ -243,7 +267,7 @@ async def _thread_persistence(
 
     async with app_db.transaction():
         if new_thread:
-            await app_db.create_user_thread(user_id, thread_id, title, llm)
+            await app_db.create_user_thread(user_id, thread_id, title, llm, project_id)
         else:
             await app_db.set_thread_updated(user_id, thread_id, llm)
 

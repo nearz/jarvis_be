@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Annotated, TypedDict, Sequence
+from typing import Annotated, TypedDict, Sequence, Union
 
 from langchain_core.messages import BaseMessage, SystemMessage, AIMessage
 from langgraph.graph import add_messages
@@ -11,7 +11,7 @@ from langgraph.prebuilt import ToolNode
 from .model import get_model
 from .tools import get_tools
 from ..core.logging import get_logger
-from ..core.llm_utils.prompts import GRAPH_SYSTEM_PROMPT
+from ..core.llm_utils.prompts import system_prompt_gen
 
 logger = get_logger(__name__)
 
@@ -23,15 +23,17 @@ class AgentState(TypedDict):
 @dataclass
 class ContextSchema:
     llm: str
+    project_instructions: Union[str, None]
 
 
 async def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
     logger.debug("LLM call started | llm: %s", runtime.context.llm)
 
-    system_prompt = SystemMessage(GRAPH_SYSTEM_PROMPT)
+    system_prompt = system_prompt_gen(runtime.context.project_instructions)
+    final_sys_prompt = SystemMessage(system_prompt)
 
     llm = get_model(runtime.context.llm)
-    all_msgs = [system_prompt] + list(state["messages"])
+    all_msgs = [final_sys_prompt] + list(state["messages"])
     response = await llm.ainvoke(all_msgs)
 
     logger.debug(

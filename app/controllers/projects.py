@@ -21,7 +21,7 @@ async def create_project_controller(
 ) -> CreateProjectResult:
     try:
         logger.debug("title: %s, user_id: %s", title, user_id)
-        project_id = str(uuid4())
+        project_id = "p-" + str(uuid4())
         project_db = await app_db.create_project(project_id, user_id, title)
 
         logger.info(

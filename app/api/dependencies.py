@@ -90,7 +90,10 @@ async def thread_validation(
     thread_id = thread_id.strip()
     logger.info("Validating thread | thread_id: %s | user_id: %s", thread_id, user.id)
     try:
-        UUID(thread_id)
+        if not thread_id.startswith("t-"):
+            raise ValueError("Thread ID must start with p-")
+
+        UUID(thread_id[2:])
         thread_does_exist = await app_db.thread_exists(thread_id)
         thread_owned = await app_db.verify_thread_ownership(user.id, thread_id)
 
@@ -144,15 +147,21 @@ async def project_validation(
     user=Depends(get_current_user),
 ) -> str:
     project_id = project_id.strip()
-    logger.info("Validating project | project_id: %s | user_id: %s", project_id, user.id)
+    logger.info(
+        "Validating project | project_id: %s | user_id: %s", project_id, user.id
+    )
     try:
-        UUID(project_id)
+        if not project_id.startswith("p-"):
+            raise ValueError("Project ID must start with p-")
+        UUID(project_id[2:])
         project_does_exist = await app_db.project_exists(project_id)
         project_owned = await app_db.verify_project_ownership(user.id, project_id)
 
     except ValueError:
         logger.warning(
-            "Invalid project_id format | project_id: %s | user_id: %s", project_id, user.id
+            "Invalid project_id format | project_id: %s | user_id: %s",
+            project_id,
+            user.id,
         )
         raise HTTPException(status_code=400, detail="Invalid project_id format")
 

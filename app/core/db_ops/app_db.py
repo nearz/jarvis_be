@@ -246,7 +246,7 @@ class AppDatabase:
     async def get_user_threads(self, user_id: str) -> Optional[list[dict[str, Any]]]:
         try:
             async with self.conn.execute(
-                """SELECT * FROM user_threads WHERE user_id = ?
+                """SELECT * FROM user_threads WHERE user_id = ? AND project_id IS NULL
                 ORDER BY updated_at DESC, created_at DESC""",
                 (user_id,),
             ) as cursor:
@@ -644,6 +644,34 @@ class AppDatabase:
             logger.exception(
                 "Verify project ownership failed - unexpected error | user_id: %s | project_id: %s",
                 user_id,
+                project_id,
+            )
+            raise DatabaseException(f"Unexpected database error: {e}") from e
+
+    async def get_project_instructions(self, project_id: str) -> Optional[str]:
+        try:
+            async with self.conn.execute(
+                "SELECT instructions FROM projects WHERE id = ?", (project_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row["instructions"] if row else None
+        except aiosqlite.OperationalError as e:
+            logger.error(
+                "Get project instructions failed - operational error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database operational error: {e}") from e
+        except aiosqlite.DatabaseError as e:
+            logger.error(
+                "Get project instructions failed - database error | project_id: %s | error: %s",
+                project_id,
+                str(e),
+            )
+            raise DatabaseException(f"Database error: {e}") from e
+        except Exception as e:
+            logger.exception(
+                "Get project instructions failed - unexpected error | project_id: %s",
                 project_id,
             )
             raise DatabaseException(f"Unexpected database error: {e}") from e

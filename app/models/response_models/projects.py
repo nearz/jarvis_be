@@ -13,6 +13,7 @@ class CreateProjectResponse(BaseModel):
 
 class ProjectResponse(BaseModel):
     success: bool = True
+    project_id: str
     title: str
     instructions: str
     created_at: datetime

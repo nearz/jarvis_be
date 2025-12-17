@@ -71,10 +71,17 @@ async def _event_generator(
     thread_id: Union[str, None],
 ):
     logger.info(
-        "Starting even generator | thread_id: %s | user_id: %s", thread_id, user_id
+        "Starting event generator | thread_id: %s | user_id: %s", thread_id, user_id
     )
     async for chunk in chat_controller(
-        message, llm, user_id, app_db, saver, graph, thread_id=thread_id
+        message,
+        llm,
+        user_id,
+        app_db,
+        saver,
+        graph,
+        thread_id=thread_id,
+        project_id=None,
     ):
         try:
             data = json.dumps(asdict(chunk))
