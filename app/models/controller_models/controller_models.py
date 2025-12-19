@@ -6,6 +6,7 @@ from datetime import datetime
 from ..token import Token
 from ..thread import Thread, ThreadMessage
 from ..project import Project
+from ..model import Model
 
 
 class ErrorType(Enum):
@@ -24,6 +25,11 @@ class BaseResult:
     success: bool
     error_type: Optional[ErrorType] = None
     error_details: Optional[str] = None
+
+
+@dataclass
+class SupportModelsResult(BaseResult):
+    supported_models: Optional[list[Model]] = None
 
 
 @dataclass

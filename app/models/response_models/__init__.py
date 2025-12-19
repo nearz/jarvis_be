@@ -1,5 +1,6 @@
 from .auth import RegisterResponse, TokenResponse, UserResponse
 from .history import HistoryResponse, ThreadHistoryResponse
+from .model import SupportModelsResponse
 from .projects import (
     ProjectResponse,
     ProjectsResponse,
@@ -17,4 +18,5 @@ __all__ = [
     "ProjectResponse",
     "ProjectsResponse",
     "UpdateProjectResponse",
+    "SupportModelsResponse",
 ]

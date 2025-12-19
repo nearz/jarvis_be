@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
+from .api.models import router as models_router
 from .api.projects import router as project_router
 from .api.chat import router as chat_router
 from .api.auth import router as auth_router
@@ -72,6 +73,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(models_router)
 app.include_router(project_router)
 app.include_router(chat_router)
 app.include_router(auth_router)
