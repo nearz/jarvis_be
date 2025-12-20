@@ -51,7 +51,7 @@ async def chat_thread(
     graph=Depends(get_app_graph),
 ):
     thread_id = thread_id.strip()
-    logger.info("Chat thread request | thread_id: %s", thread_id)
+    logger.info("Chat thread request | thread_id: %s | llm: %s", thread_id, req.llm)
 
     return StreamingResponse(
         _event_generator(
