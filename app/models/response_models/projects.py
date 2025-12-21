@@ -11,6 +11,10 @@ class CreateProjectResponse(BaseModel):
     project_id: str
 
 
+class DeleteProjectResponse(BaseModel):
+    success: bool = True
+
+
 class ProjectResponse(BaseModel):
     success: bool = True
     project_id: str

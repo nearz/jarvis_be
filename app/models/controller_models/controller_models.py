@@ -53,6 +53,11 @@ class ThreadDeleteResult(BaseResult):
 
 
 @dataclass
+class ProjectDeleteResult(BaseResult):
+    pass
+
+
+@dataclass
 class CreateProjectResult(BaseResult):
     project_id: Optional[str] = None
 

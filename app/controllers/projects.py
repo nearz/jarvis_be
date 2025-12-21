@@ -1,5 +1,6 @@
 from uuid import uuid4
 from typing import Optional
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from ..models.project import Project
 from ..models.thread import Thread
@@ -8,9 +9,11 @@ from ..models.controller_models import (
     ProjectResult,
     ProjectsResult,
     UpdateProjectResult,
+    ProjectDeleteResult,
     ErrorType,
 )
 from ..core.db_ops.app_db import AppDatabase, DatabaseException
+from ..core.db_ops.agent_checkpoints_db import delete_checkpoint_threads_bulk
 from ..core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -79,6 +82,37 @@ async def get_projects_controller(user_id: str, app_db: AppDatabase) -> Projects
     except Exception as e:
         logger.exception("System error")
         return ProjectsResult(
+            success=False,
+            error_type=ErrorType.SYSTEM_ERROR,
+            error_details="Unexpected system failure",
+        )
+
+
+async def delete_project_controller(
+    project_id: str, user_id: str, saver: AsyncSqliteSaver, app_db: AppDatabase
+) -> ProjectDeleteResult:
+    try:
+        proj_threads = await app_db.get_project_threads(project_id)
+        proj_thread_ids = []
+        if proj_threads is not None:
+            proj_thread_ids = [p["thread_id"] for p in proj_threads]
+
+        await app_db.delete_project(project_id, user_id)
+        await delete_checkpoint_threads_bulk(proj_thread_ids, saver)
+
+        return ProjectDeleteResult(success=True)
+
+    except DatabaseException as e:
+        logger.exception("Database exception occurred | user_id: %s", user_id)
+        return ProjectDeleteResult(
+            success=False,
+            error_type=ErrorType.DATABASE_ERROR,
+            error_details="Database exception occurred",
+        )
+
+    except Exception as e:
+        logger.exception("System error")
+        return ProjectDeleteResult(
             success=False,
             error_type=ErrorType.SYSTEM_ERROR,
             error_details="Unexpected system failure",

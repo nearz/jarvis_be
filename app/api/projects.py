@@ -16,9 +16,11 @@ from .dependencies import (
 )
 from ..controllers.projects import (
     create_project_controller,
+    delete_project_controller,
     get_projects_controller,
     update_project_controller,
     get_project_controller,
+    delete_project_controller,
 )
 from ..controllers.chat import chat_controller
 from ..agent.state import AgentState, ContextSchema
@@ -33,6 +35,7 @@ from ..models.response_models import (
     ProjectsResponse,
     UpdateProjectResponse,
     ProjectResponse,
+    DeleteProjectResponse,
 )
 from ..core.db_ops.app_db import AppDatabase
 from ..core.logging import get_logger
@@ -113,12 +116,6 @@ async def update_project(
     )
     return UpdateProjectResponse(project_id=project_id)
 
-    """
-    Returns:
-    Boolean? - updated succesfully
-    """
-    pass
-
 
 @router.get("/projects/{project_id}")
 async def get_project(
@@ -175,6 +172,20 @@ async def get_project(
     else:
         project_resp.threads = result.threads
         return project_resp
+
+
+@router.delete("/projects/{project_id}")
+async def delete_project(
+    project_id: str = Depends(project_validation),
+    user: User = Depends(get_current_user),
+    saver: AsyncSqliteSaver = Depends(get_graph_saver),
+    app_db: AppDatabase = Depends(get_app_db),
+):
+    result = await delete_project_controller(project_id, user.id, saver, app_db)
+    if not result.success:
+        return create_error_response(result)
+
+    return DeleteProjectResponse(success=True)
 
 
 @router.post("/projects/{project_id}/chat")
