@@ -7,6 +7,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.runtime import Runtime
 from langgraph.prebuilt import ToolNode
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .model import get_model
 from .tools import get_tools
@@ -32,7 +33,9 @@ async def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentS
     logger.debug("LLM call started | llm: %s", runtime.context.llm)
     logger.debug("Client Timestamp | ts: %s", runtime.context.client_timestamp)
 
-    date_sys_prompt = SystemMessage(f"SYSTEM_TIME={runtime.context.client_timestamp}")
+    date_sys_prompt = SystemMessage(
+        f"REFERENCE_TIME={runtime.context.client_timestamp}"
+    )
     gen_sys_prompt = SystemMessage(GENERAL_SYSTEM_PROMPT)
     sys_prompts = [date_sys_prompt, gen_sys_prompt]
 
@@ -57,11 +60,19 @@ async def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentS
 
 def should_continue(state: AgentState) -> bool:
     """Returns True if the last message has tool calls, False otherwise"""
-    last_msg = state["messages"][-1]
-    has_tool_calls = isinstance(last_msg, AIMessage) and bool(last_msg.tool_calls)
+    msgs = state["messages"]
+    if not msgs:
+        return False
+    last_msg = msgs[-1]
+    has_tool_calls = isinstance(last_msg, AIMessage) and bool(
+        getattr(last_msg, "tool_calls", None)
+    )
 
     if has_tool_calls:
-        logger.debug("Tool calls detected | tool calls: %s", last_msg.tool_calls)
+        logger.debug(
+            "Tool calls detected | tool calls: %s",
+            getattr(last_msg, "tool_calls", None),
+        )
     else:
         logger.debug("No tool calls detected")
 
@@ -69,7 +80,7 @@ def should_continue(state: AgentState) -> bool:
 
 
 def build_graph(
-    saver,
+    saver: AsyncSqliteSaver,
 ) -> CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState]:
     graph = StateGraph(AgentState, context_schema=ContextSchema)
     graph.add_node("call_llm", call_llm)
