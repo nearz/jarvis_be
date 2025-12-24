@@ -1,7 +1,7 @@
 import json
 from dataclasses import asdict
 from typing import Union
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph.state import CompiledStateGraph
@@ -29,6 +29,7 @@ router = APIRouter()
 @router.post("/chat")
 async def chat(
     req: ChatRequest,
+    client_timestamp: str = Header(..., alias="Jarvis-Client-Timestamp"),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
     saver: AsyncSqliteSaver = Depends(get_graph_saver),
@@ -36,7 +37,9 @@ async def chat(
 ):
     logger.info("New chat | message len: %d | llm: %s", len(req.message), req.llm)
     return StreamingResponse(
-        _event_generator(req.message, req.llm, user.id, app_db, saver, graph, None),
+        _event_generator(
+            req.message, req.llm, client_timestamp, user.id, app_db, saver, graph, None
+        ),
         media_type="text/event-stream",
     )
 
@@ -44,6 +47,7 @@ async def chat(
 @router.post("/chat/{thread_id}")
 async def chat_thread(
     req: ChatRequest,
+    client_timestamp: str = Header(..., alias="Jarvis-Client-Timestamp"),
     thread_id: str = Depends(thread_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
@@ -55,7 +59,14 @@ async def chat_thread(
 
     return StreamingResponse(
         _event_generator(
-            req.message, req.llm, user.id, app_db, saver, graph, thread_id
+            req.message,
+            req.llm,
+            client_timestamp,
+            user.id,
+            app_db,
+            saver,
+            graph,
+            thread_id,
         ),
         media_type="text/event-stream",
     )
@@ -64,6 +75,7 @@ async def chat_thread(
 async def _event_generator(
     message: str,
     llm: str,
+    client_timestamp: str,
     user_id: str,
     app_db: AppDatabase,
     saver: AsyncSqliteSaver,
@@ -76,6 +88,7 @@ async def _event_generator(
     async for chunk in chat_controller(
         message,
         llm,
+        client_timestamp,
         user_id,
         app_db,
         saver,

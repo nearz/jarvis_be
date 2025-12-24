@@ -40,6 +40,7 @@ logger = get_logger(__name__)
 async def chat_controller(
     message: str,
     llm: str,
+    client_timestamp: str,
     user_id: str,
     app_db: AppDatabase,
     saver: AsyncSqliteSaver,
@@ -62,12 +63,16 @@ async def chat_controller(
             message[:100],
         )
 
+        proj_title = None
         proj_instructions = None
         if project_id is not None:
-            proj_instructions = await app_db.get_project_instructions(project_id)
+            project = await app_db.get_project_by_id(project_id)
+            if project:
+                proj_title = project["title"]
+                proj_instructions = project["instructions"]
 
         config = RunnableConfig({"configurable": {"thread_id": thread_id}})
-        context = ContextSchema(llm, proj_instructions)
+        context = ContextSchema(llm, client_timestamp, proj_title, proj_instructions)
 
         async for msg, _ in graph.astream(
             {"messages": [human_msg]},

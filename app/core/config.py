@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = "logs"
+    TAVILY_LOG_DIR: str = "tavily_logs"
+    TAVILY_LOG_ENABLED: bool = True
 
     TAVILY_API_KEY: str
     TAVILY_MAX_RESULTS: int = 10

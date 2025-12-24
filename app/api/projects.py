@@ -1,7 +1,7 @@
 import json
 from dataclasses import asdict
 from typing import Union
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.graph.state import CompiledStateGraph
@@ -191,6 +191,7 @@ async def delete_project(
 @router.post("/projects/{project_id}/chat")
 async def project_new_chat(
     req: ChatRequest,
+    client_timestamp: str = Header(..., alias="Jarvis-Client-Timestamp"),
     project_id: str = Depends(project_validation),
     user: User = Depends(get_current_user),
     app_db: AppDatabase = Depends(get_app_db),
@@ -208,6 +209,7 @@ async def project_new_chat(
             project_id,
             req.message,
             req.llm,
+            client_timestamp,
             user.id,
             app_db,
             saver,
@@ -221,6 +223,7 @@ async def project_new_chat(
 @router.post("/projects/{project_id}/chat/{thread_id}")
 async def project_chat(
     req: ChatRequest,
+    client_timestamp: str = Header(..., alias="Jarvis-Client-Timestamp"),
     project_id: str = Depends(project_validation),
     thead_id: str = Depends(thread_validation),
     user: User = Depends(get_current_user),
@@ -239,6 +242,7 @@ async def project_chat(
             project_id,
             req.message,
             req.llm,
+            client_timestamp,
             user.id,
             app_db,
             saver,
@@ -253,6 +257,7 @@ async def _event_generator(
     project_id: str,
     message: str,
     llm: str,
+    client_timestamp: str,
     user_id: str,
     app_db: AppDatabase,
     saver: AsyncSqliteSaver,
@@ -269,6 +274,7 @@ async def _event_generator(
     async for chunk in chat_controller(
         message,
         llm,
+        client_timestamp,
         user_id,
         app_db,
         saver,

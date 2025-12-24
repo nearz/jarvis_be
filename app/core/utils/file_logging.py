@@ -68,29 +68,32 @@ def read_failed_persistence_log(
 
     if not FAILED_PERSISTENCE_LOG.exists():
         return []
-    
+
     entries = []
-    
+
     try:
         with open(FAILED_PERSISTENCE_LOG, "r", encoding="utf-8") as f:
             for line in f:
                 try:
                     entry = json.loads(line.strip())
-                    
+
                     # Apply filters
                     if filter_user_id and entry.get("user_id") != filter_user_id:
                         continue
-                    if filter_error_type and entry.get("error_type") != filter_error_type:
+                    if (
+                        filter_error_type
+                        and entry.get("error_type") != filter_error_type
+                    ):
                         continue
-                    
+
                     entries.append(entry)
-                    
+
                 except json.JSONDecodeError as e:
                     logger.warning("Failed to parse log entry: %s", str(e))
                     continue
-        
+
         return entries
-        
+
     except Exception as e:
         logger.error("Failed to read failed persistence log: %s", str(e))
         return []
@@ -99,10 +102,49 @@ def read_failed_persistence_log(
 def count_failed_persistence() -> int:
     if not FAILED_PERSISTENCE_LOG.exists():
         return 0
-    
+
     try:
         with open(FAILED_PERSISTENCE_LOG, "r", encoding="utf-8") as f:
             return sum(1 for _ in f)
     except Exception as e:
         logger.error("Failed to count log entries: %s", str(e))
         return 0
+
+
+# Path for Tavily search log file
+TAVILY_SEARCH_LOG = (
+    Path(settings.LOG_DIR) / settings.TAVILY_LOG_DIR / "tavily_searches.jsonl"
+)
+
+
+def log_tavily_search(
+    query: str,
+    results: list[dict],
+    result_count: int,
+) -> None:
+    """
+    Log Tavily search results to a JSONL file for inspection.
+
+    Args:
+        query: The search query string
+        results: The raw results from Tavily API
+        result_count: Number of results returned
+    """
+    if not settings.TAVILY_LOG_ENABLED:
+        return
+
+    try:
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "query": query,
+            "result_count": result_count,
+            "results": results,
+        }
+
+        TAVILY_SEARCH_LOG.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(TAVILY_SEARCH_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+
+    except Exception as log_error:
+        logger.warning("Failed to log Tavily search: %s", str(log_error))

@@ -4,6 +4,7 @@ from .tavily_client import get_async_tavily_client, MissingApiKey
 from ..core.logging import get_logger
 from ..core.config import settings
 from ..core.utils.web_extract import should_extract, sanitize_markdown
+from ..core.utils.file_logging import log_tavily_search
 
 logger = get_logger(__name__)
 
@@ -101,6 +102,7 @@ async def tavily_search(query: str) -> str:
             logger.warning("No results for query: %s", query)
             return f"No results found for query: {query}"
 
+        log_tavily_search(query, results, len(results))
         logger.info("Tavily search complete | results count: %d", len(results))
 
         lines = [f"Search results for '{query}'"]

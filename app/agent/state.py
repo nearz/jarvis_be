@@ -11,7 +11,7 @@ from langgraph.prebuilt import ToolNode
 from .model import get_model
 from .tools import get_tools
 from ..core.logging import get_logger
-from ..core.llm_utils.prompts import system_prompt_gen
+from ..core.llm_utils.prompts import GENERAL_SYSTEM_PROMPT, project_inst_sys_prompt
 
 logger = get_logger(__name__)
 
@@ -23,23 +23,33 @@ class AgentState(TypedDict):
 @dataclass
 class ContextSchema:
     llm: str
+    client_timestamp: str
+    project_title: Union[str, None]
     project_instructions: Union[str, None]
 
 
 async def call_llm(state: AgentState, runtime: Runtime[ContextSchema]) -> AgentState:
     logger.debug("LLM call started | llm: %s", runtime.context.llm)
+    logger.debug("Client Timestamp | ts: %s", runtime.context.client_timestamp)
 
-    system_prompt = system_prompt_gen(runtime.context.project_instructions)
-    final_sys_prompt = SystemMessage(system_prompt)
+    date_sys_prompt = SystemMessage(f"SYSTEM_TIME={runtime.context.client_timestamp}")
+    gen_sys_prompt = SystemMessage(GENERAL_SYSTEM_PROMPT)
+    sys_prompts = [date_sys_prompt, gen_sys_prompt]
+
+    if runtime.context.project_title is not None:
+        title = runtime.context.project_title
+        inst = runtime.context.project_instructions
+        proj_sys_prompt = SystemMessage(project_inst_sys_prompt(title, inst))
+        sys_prompts.append(proj_sys_prompt)
 
     llm = get_model(runtime.context.llm)
-    all_msgs = [final_sys_prompt] + list(state["messages"])
+    all_msgs = sys_prompts + list(state["messages"])
     response = await llm.ainvoke(all_msgs)
 
+    # TODO: Should add llm response when logging to file?
     logger.debug(
-        "LLM response received | llm: %s | ai message preview: %s",
+        "LLM response received | llm: %s",
         runtime.context.llm,
-        response.content if response.content else "",
     )
 
     return {"messages": [response]}
