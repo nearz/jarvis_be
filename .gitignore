@@ -8,6 +8,7 @@ trash.md
 tmp/
 temp_test/
 logs/
+BAK_reqs.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
