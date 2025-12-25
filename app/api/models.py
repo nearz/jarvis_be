@@ -18,4 +18,6 @@ async def get_supported_models(user: User = Depends(get_current_user)):
     if not result.success:
         return create_error_response(result)
 
-    return SupportModelsResponse(supported_models=result.supported_models)
+    models = result.supported_models if result.supported_models else []
+
+    return SupportModelsResponse(supported_models=models)
