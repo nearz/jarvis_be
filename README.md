@@ -8,7 +8,7 @@
 
 - [X] Single Thread
 - [X] Project Space
-- [ ] Chapt-style anchors for human-messages and AI response headers
+- [ ] Chapter-style anchors for human-messages and AI response headers
 - [ ] Branching threads
 
 ## TODO
