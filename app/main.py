@@ -15,7 +15,7 @@ from .agent.tavily_client import get_async_tavily_client, MissingApiKey
 from .core.config import settings
 from .core.logging import setup_logging, get_logger
 from .core.db_ops.app_db import init_app_db, AppDatabase
-from .middleware import LoggingMiddleware
+from .middleware import LoggingMiddleware, DelayMiddleware
 
 from dotenv import load_dotenv
 
@@ -63,6 +63,7 @@ app = FastAPI(
 )
 
 app.add_middleware(LoggingMiddleware)
+app.add_middleware(DelayMiddleware)
 
 # Configure CORS
 app.add_middleware(

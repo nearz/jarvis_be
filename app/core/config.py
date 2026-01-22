@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     APP_TITLE: str
     APP_DESCRIPTION: str
     APP_VER: str
+    APP_ENV: str
+    DELAY_SECONDS: float = 0.0
 
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
