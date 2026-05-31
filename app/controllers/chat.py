@@ -48,6 +48,7 @@ async def chat_controller(
     *,
     thread_id: Union[str, None],
     project_id: Union[str, None],
+    attached_context: Union[str, None],
 ):
     new_thread = False
     if not thread_id:
@@ -56,7 +57,16 @@ async def chat_controller(
         logger.info("New thread created | thread_id: %s", thread_id)
 
     try:
-        human_msg = HumanMessage(message)
+        human_msg = HumanMessage(content="")
+        if attached_context:
+            human_msg.content = f"<attached_context>\n{attached_context}\n</attached_context>\n\n{message}"
+            human_msg.additional_kwargs = {
+                "user_prompt": message,
+                "attached_context": attached_context,
+            }
+        else:
+            human_msg.content = message
+
         logger.debug(
             "Invoking graph | thread_id: %s | message preview: %s",
             thread_id,
@@ -263,7 +273,17 @@ async def _thread_persistence(
     if not last_ai_msg or not isinstance(last_ai_msg.id, str):
         raise ValueError("Invalid AI message or missing message ID")
 
-    human_msg_txt = get_msg_content_text(last_human_msg.content)
+    if last_human_msg.additional_kwargs.get(
+        "attached_context"
+    ) and last_human_msg.additional_kwargs.get("user_prompt"):
+        human_msg_txt = last_human_msg.additional_kwargs["user_prompt"]
+        attached_context = last_human_msg.additional_kwargs["attached_context"]
+    else:
+        human_msg_txt = get_msg_content_text(last_human_msg.content)
+        attached_context = None
+
+    logger.debug(f"h-msg {human_msg_txt}, ac: {attached_context}")
+
     ai_msg_txt = get_msg_content_text(last_ai_msg.content)
 
     title = ""
@@ -282,6 +302,7 @@ async def _thread_persistence(
             llm,
             last_human_msg.id,
             thread_id,
+            attached_context,
         )
 
         await app_db.create_thread_msg(

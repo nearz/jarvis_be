@@ -378,20 +378,34 @@ class AppDatabase:
             raise DatabaseException(f"Unexpected database error: {e}") from e
 
     async def create_thread_msg(
-        self, content: str, msg_type: str, llm: str, msg_id: str, thread_id: str
+        self,
+        content: str,
+        msg_type: str,
+        llm: str,
+        msg_id: str,
+        thread_id: str,
+        attached_context: Optional[str] = None,
     ) -> None:
         try:
             # Transaction handled externally for commit.
             await self.conn.execute(
                 """INSERT INTO thread_messages 
-                   (content, message_type, llm, message_index, message_id, thread_id)
+                   (content, message_type, llm, message_index, message_id, thread_id, attached_context)
                     SELECT ?, ?, ?, 
                        COALESCE(MAX(message_index), 0) + 1,
-                       ?, ?
+                       ?, ?, ?
                     FROM thread_messages 
                     WHERE thread_id = ?
                     ON CONFLICT(thread_id, message_id) DO NOTHING""",
-                (content, msg_type, llm, msg_id, thread_id, thread_id),
+                (
+                    content,
+                    msg_type,
+                    llm,
+                    msg_id,
+                    thread_id,
+                    attached_context,
+                    thread_id,
+                ),
             )
             return
         except aiosqlite.IntegrityError as e:
@@ -913,6 +927,7 @@ async def init_app_db(conn: aiosqlite.Connection):
         llm TEXT,
         message_type TEXT NOT NULL CHECK(message_type IN ('user', 'ai')),
         content TEXT,
+        attached_context TEXT,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         FOREIGN KEY (thread_id) REFERENCES user_threads(thread_id) ON DELETE CASCADE,
         UNIQUE(thread_id, message_id),

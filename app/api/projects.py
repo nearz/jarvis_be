@@ -215,6 +215,7 @@ async def project_new_chat(
             saver,
             graph,
             thread_id=None,
+            attached_context=None,
         ),
         media_type="text/event-stream",
     )
@@ -248,6 +249,7 @@ async def project_chat(
             saver,
             graph,
             thread_id=thead_id,
+            attached_context=req.attached_context,
         ),
         media_type="text/event-stream",
     )
@@ -264,6 +266,7 @@ async def _event_generator(
     graph: CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState],
     *,
     thread_id: Union[str, None],
+    attached_context: Union[str, None],
 ):
     logger.info(
         "Starting event generator | project_id: %s | thread_id: %s | user_id: %s",
@@ -281,6 +284,7 @@ async def _event_generator(
         graph,
         thread_id=thread_id,
         project_id=project_id,
+        attached_context=attached_context,
     ):
         try:
             data = json.dumps(asdict(chunk))

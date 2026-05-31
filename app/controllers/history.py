@@ -84,6 +84,7 @@ async def thread_message_history_controller(
                 message_id=m["message_id"],
                 thread_id=m["thread_id"],
                 created_at=m["created_at"],
+                attached_context=m["attached_context"],
             )
             for m in msgs_db
         ]

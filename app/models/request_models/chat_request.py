@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
+from typing import Optional
 
 from app.agent.supported_models import supported_models
 
@@ -8,6 +9,7 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
     llm: str = Field(min_length=1)
     edited: datetime = Field(default_factory=datetime.utcnow)
+    attached_context: Optional[str] = None
 
     @field_validator("message", "llm")
     @classmethod

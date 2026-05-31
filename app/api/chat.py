@@ -38,7 +38,15 @@ async def chat(
     logger.info("New chat | message len: %d | llm: %s", len(req.message), req.llm)
     return StreamingResponse(
         _event_generator(
-            req.message, req.llm, client_timestamp, user.id, app_db, saver, graph, None
+            req.message,
+            req.llm,
+            client_timestamp,
+            user.id,
+            app_db,
+            saver,
+            graph,
+            thread_id=None,
+            attached_context=None,
         ),
         media_type="text/event-stream",
     )
@@ -66,7 +74,8 @@ async def chat_thread(
             app_db,
             saver,
             graph,
-            thread_id,
+            thread_id=thread_id,
+            attached_context=req.attached_context,
         ),
         media_type="text/event-stream",
     )
@@ -80,7 +89,9 @@ async def _event_generator(
     app_db: AppDatabase,
     saver: AsyncSqliteSaver,
     graph: CompiledStateGraph[AgentState, ContextSchema, AgentState, AgentState],
+    *,
     thread_id: Union[str, None],
+    attached_context: Union[str, None],
 ):
     logger.info(
         "Starting event generator | thread_id: %s | user_id: %s", thread_id, user_id
@@ -95,6 +106,7 @@ async def _event_generator(
         graph,
         thread_id=thread_id,
         project_id=None,
+        attached_context=attached_context,
     ):
         try:
             data = json.dumps(asdict(chunk))

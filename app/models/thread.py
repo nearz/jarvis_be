@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 from datetime import datetime
 
 
@@ -18,3 +19,4 @@ class ThreadMessage(BaseModel):
     message_id: str
     thread_id: str
     created_at: datetime
+    attached_context: Optional[str] = None
